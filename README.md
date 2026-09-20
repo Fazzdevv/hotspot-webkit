@@ -72,7 +72,7 @@ Aplikasi ini dirancang khusus untuk skenario **Offline Intranet**, sistem inform
 2. Buka aplikasi **Hotspot WebKit**.
 3. Periksa bagian **Hardware Network Interface**: aplikasi akan otomatis mendeteksi **IP Asli** (misal `192.168.43.1`) dan **Port 8080**.
 4. Tekan tombol **"Nyalakan Server & Proxy (Port 8080)"**.
-5. *(Opsional)* Tekan **"Import .ZIP Baru"** untuk memilih website kustom Anda dari storage HP (tersedia file contoh `sample_website.zip`).
+5. *(Opsional)* Tekan **"Import .ZIP Baru"** untuk memilih website kustom Anda dari storage HP.
 
 ### 2. Di Perangkat Klien (HP / Laptop Lain):
 1. Hubungkan perangkat klien ke Wi-Fi Hotspot Android tersebut.
@@ -126,7 +126,6 @@ hotspot-webkit/
 │   │   ├── res/                             # Resource layout, strings, icons
 │   │   └── AndroidManifest.xml
 │   └── build.gradle.kts
-├── sample_website.zip                       # Paket website demo siap uji
 ├── settings.gradle.kts
 └── build.gradle.kts
 ```
