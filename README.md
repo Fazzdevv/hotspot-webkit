@@ -1,4 +1,4 @@
-# Hotspot WebKit v0.1 🚀
+# Hotspot WebKit v0.1
 
 [![Android Min SDK](https://img.shields.io/badge/Min%20SDK-26%2B%20%28Android%208.0%2B%29-brightgreen.svg)](https://developer.android.com)
 [![Target SDK](https://img.shields.io/badge/Target%20SDK-34%20%28Android%2014%29-blue.svg)](https://developer.android.com)
@@ -13,26 +13,19 @@ Aplikasi ini dirancang khusus untuk skenario **Offline Intranet**, sistem inform
 
 ---
 
-## ✨ Fitur Utama
+## Fitur Utama
 
-- 🎯 **Deteksi IP Native Hardware (Bukan Tebakan)**
-  Secara otomatis mengiterasi interface jaringan hardware Android (`ap0`, `wlan1`, `swlan0`, `softap`) untuk mendeteksi alamat IPv4 tethering yang sebenarnya secara akurat.
-- 📦 **Dynamic ZIP Package Host**
-  Dapat menjalankan website apa pun (HTML, CSS, JS, React/Vue build) cukup dengan mengimpor file `.zip` dari penyimpanan internal HP menggunakan *Android Storage Access Framework (SAF)*. Dilengkapi proteksi keamanan terhadap *Zip-Slip Vulnerability*.
-- 🔀 **Proxy Interceptor (HTTP 302 Redirect)**
-  Menjalankan proxy lokal di Port `8080`. Saat klien membuka website apa pun di browser (misal: `google.com`, `detik.com`), lalu lintas langsung dibelokkan secara otomatis (*HTTP 302 Found*) ke website lokal dari file ZIP Anda.
-- ⚡ **HTTP 206 Partial Content (Media Streaming)**
-  Mendukung pemutaran audio dan video dengan fitur *seeking* / *scrubbing* yang mulus langsung di browser klien.
-- 📱 **Modern Jetpack Compose UI**
-  Antarmuka bertema gelap (*Cyber Dark Slate*) yang elegan dengan indikator status beranimasi pulsasi, generator **QR Code instan**, tombol satu ketukan untuk salin IP/URL, serta **Live Traffic Radar** untuk memantau request klien secara real-time.
-- 🔋 **Background Persistence (Foreground Service & WakeLock)**
-  Dilengkapi Android Foreground Service dengan `PowerManager.PARTIAL_WAKE_LOCK` dan `WifiManager.WifiLock` agar server tetap aktif melayani klien 24/7 meskipun layar HP dimatikan.
-- 📄 **WPAD / PAC Support**
-  Menyediakan endpoint script auto-config proxy di `/wpad.dat` dan `/proxy.pac`.
+- **Deteksi IP Native Hardware (Bukan Tebakan)**: Secara otomatis mengiterasi interface jaringan hardware Android (`ap0`, `wlan1`, `swlan0`, `softap`) untuk mendeteksi alamat IPv4 tethering yang sebenarnya secara akurat.
+- **Dynamic ZIP Package Host**: Dapat menjalankan website apa pun (HTML, CSS, JS, React/Vue build) cukup dengan mengimpor file `.zip` dari penyimpanan internal HP menggunakan *Android Storage Access Framework (SAF)*. Dilengkapi proteksi keamanan terhadap *Zip-Slip Vulnerability*.
+- **Proxy Interceptor (HTTP 302 Redirect)**: Menjalankan proxy lokal di Port `8080`. Saat klien membuka website apa pun di browser (misal: `google.com`, `detik.com`), lalu lintas langsung dibelokkan secara otomatis (*HTTP 302 Found*) ke website lokal dari file ZIP Anda.
+- **HTTP 206 Partial Content (Media Streaming)**: Mendukung pemutaran audio dan video dengan fitur *seeking* / *scrubbing* yang mulus langsung di browser klien.
+- **Modern Jetpack Compose UI**: Antarmuka bertema gelap (*Cyber Dark Slate*) yang elegan dengan indikator status beranimasi pulsasi, generator **QR Code instan**, tombol satu ketukan untuk salin IP/URL, serta **Live Traffic Radar** untuk memantau request klien secara real-time.
+- **Background Persistence (Foreground Service & WakeLock)**: Dilengkapi Android Foreground Service dengan `PowerManager.PARTIAL_WAKE_LOCK` dan `WifiManager.WifiLock` agar server tetap aktif melayani klien 24/7 meskipun layar HP dimatikan.
+- **WPAD / PAC Support**: Menyediakan endpoint script auto-config proxy di `/wpad.dat` dan `/proxy.pac`.
 
 ---
 
-## 🛠️ Arsitektur Sistem
+## Arsitektur Sistem
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -72,7 +65,7 @@ Aplikasi ini dirancang khusus untuk skenario **Offline Intranet**, sistem inform
 
 ---
 
-## 🚀 Panduan Penggunaan Cepat
+## Panduan Penggunaan Cepat
 
 ### 1. Di HP Android Server:
 1. Nyalakan **Hotspot Portabel / Tethering** di pengaturan Android Anda.
@@ -93,7 +86,7 @@ Aplikasi ini dirancang khusus untuk skenario **Offline Intranet**, sistem inform
 
 ---
 
-## 💻 Cara Build dari Source Code
+## Cara Build dari Source Code
 
 ### Prasyarat:
 - Java JDK 17
@@ -112,10 +105,10 @@ File APK hasil build akan berada di `app/build/outputs/apk/debug/app-debug.apk`.
 
 ---
 
-## 📁 Struktur Direktori Proyek
+## Struktur Direktori Proyek
 
 ```
-proyek-hotspot-webkit/
+hotspot-webkit/
 ├── app/
 │   ├── src/main/
 │   │   ├── java/com/fazzdev/offlineedgeportal/
@@ -140,6 +133,6 @@ proyek-hotspot-webkit/
 
 ---
 
-## 📄 Lisensi
+## Lisensi
 
 Proyek ini dirilis di bawah lisensi [MIT License](LICENSE). Bebas digunakan, dimodifikasi, dan didistribusikan untuk keperluan personal maupun komersial.
