@@ -188,56 +188,63 @@ fun HeaderSection(isRunning: Boolean) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = 12.dp)
+        ) {
             Text(
                 text = "Hotspot WebKit PS4-PS5 v1.0",
                 color = TextPrimary,
-                fontSize = 22.sp,
+                fontSize = 20.sp,
                 fontWeight = FontWeight.Bold
             )
             Text(
                 text = "Offline Exploit Host & Edge Server (Non-Root)",
                 color = TextSecondary,
-                fontSize = 13.sp
+                fontSize = 12.sp
             )
         }
 
-        // Status Badge
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .clip(RoundedCornerShape(99.dp))
-                .background(if (isRunning) NeonGreen.copy(alpha = 0.15f) else DarkSlateElevated)
-                .border(
-                    width = 1.dp,
-                    color = if (isRunning) NeonGreen.copy(alpha = 0.5f) else Color.Transparent,
-                    shape = RoundedCornerShape(99.dp)
-                )
-                .padding(horizontal = 12.dp, vertical = 6.dp)
-        ) {
-            val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-            val alpha by infiniteTransition.animateFloat(
-                initialValue = 0.3f,
-                targetValue = 1.0f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(800),
-                    repeatMode = RepeatMode.Reverse
-                ),
-                label = "alpha"
-            )
+        // Status Dot Indicator (Green = Online, Red = Offline)
+        val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+        val alpha by infiniteTransition.animateFloat(
+            initialValue = 0.35f,
+            targetValue = 1.0f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(800),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "alpha"
+        )
 
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(if (isRunning) NeonGreen.copy(alpha = 0.15f) else CrimsonAlert.copy(alpha = 0.15f))
+                .border(
+                    width = 1.5.dp,
+                    color = if (isRunning) NeonGreen.copy(alpha = 0.5f) else CrimsonAlert.copy(alpha = 0.4f),
+                    shape = CircleShape
+                )
+        ) {
+            // Subtle pulse halo when running
+            if (isRunning) {
+                Box(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .clip(CircleShape)
+                        .background(NeonGreen.copy(alpha = 0.25f * alpha))
+                )
+            }
+            // Core indicator dot (Green = Online, Red = Offline)
             Box(
                 modifier = Modifier
-                    .size(8.dp)
+                    .size(10.dp)
                     .clip(CircleShape)
                     .background(if (isRunning) NeonGreen.copy(alpha = alpha) else CrimsonAlert)
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = if (isRunning) "ACTIVE" else "OFFLINE",
-                color = if (isRunning) NeonGreen else TextMuted,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold
             )
         }
     }
