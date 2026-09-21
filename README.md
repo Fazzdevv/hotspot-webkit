@@ -110,7 +110,7 @@ cd hotspot-webkit
 # Build APK Debug
 ./gradlew assembleDebug
 ```
-File APK hasil build akan berada di `app/build/outputs/apk/debug/app-debug.apk` atau folder `release/hotspot-webkit-v0.1.apk`.
+File APK hasil build akan berada di `app/build/outputs/apk/debug/app-debug.apk` atau folder `release/hotspot-webkit-ps4-ps5-v1.0.apk`.
 
 ---
 

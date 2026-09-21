@@ -190,7 +190,7 @@ fun HeaderSection(isRunning: Boolean) {
     ) {
         Column {
             Text(
-                text = "Hotspot WebKit PS4-PS5",
+                text = "Hotspot WebKit PS4-PS5 v1.0",
                 color = TextPrimary,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold
@@ -630,15 +630,19 @@ fun ClientSetupGuideCard(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
-            Text(
-                text = "Panduan Setting Konsol PS4 & PS5",
-                color = TextPrimary,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(imageVector = Icons.Default.PlayArrow, contentDescription = null, tint = NeonGreen)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Panduan Setting Konsol PS4 & PS5",
+                    color = TextPrimary,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "Hubungkan PS4 atau PS5 ke Wi-Fi Hotspot HP ini, lalu konfigurasi Proxy:",
+                text = "Hubungkan konsol PS4/PS5 ke Wi-Fi Hotspot HP ini, lalu konfigurasi Proxy:",
                 color = TextSecondary,
                 fontSize = 12.sp,
                 lineHeight = 16.sp
@@ -662,27 +666,56 @@ fun ClientSetupGuideCard(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Dedicated PS4 & PS5 Step-by-Step Box
+            // PS4 Instructions
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(10.dp))
                     .background(DarkSlateElevated)
-                    .padding(14.dp)
+                    .padding(12.dp)
             ) {
                 Text(
-                    text = "🎮 Langkah-Langkah di PS4 & PS5:",
+                    text = "🎮 Langkah di PlayStation 4 (PS4):",
                     color = CyberCyan,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "1. Buka Pengaturan (Settings) > Jaringan (Network) > Siapkan Koneksi Internet (Set Up Internet Connection).\n" +
-                           "2. Pilih Gunakan Wi-Fi > pilih mode Khusus (Custom / Advanced Settings).\n" +
-                           "3. Pada Server Proksi (Proxy Server): pilih Gunakan (Use), lalu isi Hostname & Port di atas.\n" +
-                           "4. Pengaturan lainnya (IP, DNS, MTU): biarkan Otomatis (Automatic).\n" +
-                           "5. Cara Akses: Buka menu Panduan Pengguna (User's Guide) di Pengaturan PS4/PS5 atau buka Browser Internet. Halaman dari file .ZIP akan langsung terbuka 100%!",
+                    text = "1. Buka Pengaturan > Jaringan > Siapkan Koneksi Internet.\n" +
+                           "2. Pilih Gunakan Wi-Fi > pilih mode Khusus (Custom).\n" +
+                           "3. Pada Server Proksi (Proxy Server): pilih Gunakan (Use), masukkan Host & Port di atas.\n" +
+                           "4. Opsi lainnya (IP, DNS, MTU): biarkan Otomatis.\n" +
+                           "5. Buka Pengaturan > Panduan Pengguna (User's Guide). Website/exploit dari file .ZIP akan langsung tampil 100%!",
+                    color = TextPrimary,
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // PS5 Instructions
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(DarkSlateElevated)
+                    .padding(12.dp)
+            ) {
+                Text(
+                    text = "🎮 Langkah di PlayStation 5 (PS5):",
+                    color = NeonGreen,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "1. Buka Pengaturan > Jaringan > Pengaturan > Siapkan Koneksi Internet.\n" +
+                           "2. Tekan tombol Opsi pada Wi-Fi Hotspot ini > Pengaturan Lanjutan (Advanced Settings).\n" +
+                           "3. Pada Server Proksi: pilih Gunakan (Use), masukkan Host & Port di atas.\n" +
+                           "4. Opsi lainnya: biarkan Otomatis.\n" +
+                           "5. Buka Pengaturan > Panduan & Kiat... > Panduan Pengguna (User's Guide) untuk langsung memuat exploit!",
                     color = TextPrimary,
                     fontSize = 12.sp,
                     lineHeight = 17.sp
