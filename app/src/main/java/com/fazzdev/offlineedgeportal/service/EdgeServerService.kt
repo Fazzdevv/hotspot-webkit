@@ -236,7 +236,7 @@ class EdgeServerService : Service() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Offline Edge Portal & Proxy")
+            .setContentTitle("Hotspot WebKit PS4-PS5")
             .setContentText(statusText)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(pendingIntent)

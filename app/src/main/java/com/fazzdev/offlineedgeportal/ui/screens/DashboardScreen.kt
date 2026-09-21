@@ -190,13 +190,13 @@ fun HeaderSection(isRunning: Boolean) {
     ) {
         Column {
             Text(
-                text = "Hotspot WebKit v0.1",
+                text = "Hotspot WebKit PS4-PS5",
                 color = TextPrimary,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "Localhost & Non-Root Proxy Interceptor",
+                text = "Offline Exploit Host & Edge Server (Non-Root)",
                 color = TextSecondary,
                 fontSize = 13.sp
             )
@@ -631,14 +631,14 @@ fun ClientSetupGuideCard(
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
             Text(
-                text = "Panduan Setting Klien (Agar Auto-Redirect)",
+                text = "Panduan Setting Konsol PS4 & PS5",
                 color = TextPrimary,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "Di menu Wi-Fi perangkat klien yang terhubung ke hotspot ini, ubah Proxy menjadi Manual:",
+                text = "Hubungkan PS4 atau PS5 ke Wi-Fi Hotspot HP ini, lalu konfigurasi Proxy:",
                 color = TextSecondary,
                 fontSize = 12.sp,
                 lineHeight = 16.sp
@@ -653,20 +653,41 @@ fun ClientSetupGuideCard(
                     .background(DarkNavyBg)
                     .padding(12.dp)
             ) {
-                GuideRow(label = "Proxy Hostname", value = ipAddress)
+                GuideRow(label = "Proxy Hostname / Address", value = ipAddress)
                 Spacer(modifier = Modifier.height(6.dp))
                 GuideRow(label = "Proxy Port", value = port.toString())
                 Spacer(modifier = Modifier.height(6.dp))
                 GuideRow(label = "Bypass Proxy", value = "(Kosongkan)")
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
-            Text(
-                text = "💡 Setelah diisi, klien buka web apa saja di browser akan langsung otomatis dibelokkan ke web dari file .ZIP.",
-                color = ElectricBlue,
-                fontSize = 11.sp,
-                lineHeight = 15.sp
-            )
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Dedicated PS4 & PS5 Step-by-Step Box
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(DarkSlateElevated)
+                    .padding(14.dp)
+            ) {
+                Text(
+                    text = "🎮 Langkah-Langkah di PS4 & PS5:",
+                    color = CyberCyan,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "1. Buka Pengaturan (Settings) > Jaringan (Network) > Siapkan Koneksi Internet (Set Up Internet Connection).\n" +
+                           "2. Pilih Gunakan Wi-Fi > pilih mode Khusus (Custom / Advanced Settings).\n" +
+                           "3. Pada Server Proksi (Proxy Server): pilih Gunakan (Use), lalu isi Hostname & Port di atas.\n" +
+                           "4. Pengaturan lainnya (IP, DNS, MTU): biarkan Otomatis (Automatic).\n" +
+                           "5. Cara Akses: Buka menu Panduan Pengguna (User's Guide) di Pengaturan PS4/PS5 atau buka Browser Internet. Halaman dari file .ZIP akan langsung terbuka 100%!",
+                    color = TextPrimary,
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp
+                )
+            }
         }
     }
 }

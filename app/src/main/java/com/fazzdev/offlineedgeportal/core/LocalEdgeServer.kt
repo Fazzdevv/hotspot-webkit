@@ -15,6 +15,7 @@ import java.io.InputStream
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
+import java.net.URLDecoder
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -120,40 +121,76 @@ class LocalEdgeServer(
             }
 
             val nativeIp = currentNativeIp()
+            val lowerHost = hostHeader.lowercase(Locale.ROOT)
+            val lowerUrl = fullUrlOrPath.lowercase(Locale.ROOT)
 
-            // Determine if request is targeting external site (Proxy Interceptor)
-            val isProxyIntercept = isExternalProxyRequest(method, fullUrlOrPath, hostHeader, nativeIp)
-
-            if (isProxyIntercept) {
-                // REDIRECT EXTERNAL REQUEST TO LOCAL PORTAL
-                val redirectLocation = "http://$nativeIp:$port/"
-                val response = (
-                    "HTTP/1.1 302 Found\r\n" +
-                    "Location: $redirectLocation\r\n" +
-                    "Connection: close\r\n" +
-                    "Cache-Control: no-cache, no-store, must-revalidate\r\n" +
-                    "Content-Type: text/html; charset=UTF-8\r\n" +
-                    "Content-Length: 0\r\n\r\n"
-                ).toByteArray(Charsets.UTF_8)
-
-                output.write(response)
-                output.flush()
-
+            // 1. PlayStation Connection Test (PS4 & PS5 netcheck)
+            if (isPlayStationNetcheck(lowerHost, lowerUrl)) {
+                serveNetcheckSuccess(output)
                 onLog(
                     RequestLog(
                         timestamp = System.currentTimeMillis(),
                         clientIp = clientIp,
                         method = method,
-                        host = hostHeader.ifEmpty { fullUrlOrPath },
+                        host = hostHeader.ifEmpty { "netcheck.playstation.net" },
                         uri = fullUrlOrPath,
-                        isRedirected = true,
-                        statusCode = 302
+                        isRedirected = false,
+                        statusCode = 200
                     )
                 )
-            } else {
-                // SERVE LOCAL CONTENT OR PAC SCRIPT
-                handleLocalRequest(method, fullUrlOrPath, rangeHeader, output, clientIp, nativeIp)
+                return
             }
+
+            // 2. PlayStation System Software Update Blocker (PS4 & PS5)
+            if (isPlayStationUpdate(lowerHost, lowerUrl)) {
+                serveUpdateBlocker(output)
+                onLog(
+                    RequestLog(
+                        timestamp = System.currentTimeMillis(),
+                        clientIp = clientIp,
+                        method = method,
+                        host = hostHeader.ifEmpty { "update.playstation.net" },
+                        uri = fullUrlOrPath,
+                        isRedirected = false,
+                        statusCode = 200
+                    )
+                )
+                return
+            }
+
+            // 3. Handle HTTPS CONNECT Proxy Handshake
+            if (method == "CONNECT") {
+                val targetHost = fullUrlOrPath.substringBefore(":")
+                if (!isLocalTarget(targetHost, nativeIp)) {
+                    serveConnectNotSupported(output)
+                    onLog(
+                        RequestLog(
+                            timestamp = System.currentTimeMillis(),
+                            clientIp = clientIp,
+                            method = method,
+                            host = hostHeader.ifEmpty { targetHost },
+                            uri = fullUrlOrPath,
+                            isRedirected = false,
+                            statusCode = 405
+                        )
+                    )
+                    return
+                }
+            }
+
+            // 4. All-Domain Direct Serving Engine (Wildcard Localhost)
+            // Semua link / domain HTTP apa pun (google.com, manuals.playstation.net, detik.com, dll.)
+            // langsung di-handle dan disajikan dengan HTTP 200 OK dari website lokal tanpa redirect 302!
+            val isPs = isPlayStationUserGuide(lowerHost, lowerUrl)
+            handleLocalRequest(
+                method = method,
+                rawPath = fullUrlOrPath,
+                rangeHeader = rangeHeader,
+                output = output,
+                clientIp = clientIp,
+                nativeIp = hostHeader.ifEmpty { nativeIp },
+                isPlayStation = isPs
+            )
         } catch (e: Exception) {
             // Client disconnect or timeout
         } finally {
@@ -165,39 +202,40 @@ class LocalEdgeServer(
         }
     }
 
-    private fun isExternalProxyRequest(
-        method: String,
-        urlOrPath: String,
-        hostHeader: String,
-        nativeIp: String
-    ): Boolean {
-        // HTTPS CONNECT request for non-local domain
-        if (method == "CONNECT") {
-            val targetHost = urlOrPath.substringBefore(":")
-            return !isLocalTarget(targetHost, nativeIp)
-        }
-
-        // Full URL starting with http://
-        if (urlOrPath.startsWith("http://", ignoreCase = true) || urlOrPath.startsWith("https://", ignoreCase = true)) {
-            val domain = urlOrPath.substringAfter("://").substringBefore("/").substringBefore(":")
-            return !isLocalTarget(domain, nativeIp)
-        }
-
-        // Host header check
-        if (hostHeader.isNotEmpty()) {
-            val domain = hostHeader.substringBefore(":")
-            return !isLocalTarget(domain, nativeIp)
-        }
-
-        return false
+    private fun isPlayStationNetcheck(lowerHost: String, lowerUrl: String): Boolean {
+        return lowerHost.contains("netcheck.playstation.net") ||
+                lowerUrl.contains("netcheck.playstation.net") ||
+                (lowerHost.contains("playstation.net") && lowerUrl.contains("/netcheck"))
     }
 
+    private fun isPlayStationUpdate(lowerHost: String, lowerUrl: String): Boolean {
+        return lowerHost.contains("update.playstation.net") ||
+                lowerHost.contains("upgrades.net") ||
+                lowerUrl.contains("update.playstation.net") ||
+                lowerUrl.contains("upgrades.net") ||
+                lowerUrl.contains("/update/ps4") ||
+                lowerUrl.contains("/update/ps5")
+    }
+
+    private fun isPlayStationUserGuide(lowerHost: String, lowerUrl: String): Boolean {
+        return lowerHost.contains("manuals.playstation.net") ||
+                lowerHost.contains("doc.dl.playstation.net") ||
+                lowerUrl.contains("manuals.playstation.net") ||
+                lowerUrl.contains("doc.dl.playstation.net") ||
+                lowerUrl.contains("/document/en/ps4") ||
+                lowerUrl.contains("/document/en/ps5") ||
+                lowerUrl.contains("/document/") ||
+                lowerUrl.contains("/doc/ps5")
+    }
     private fun isLocalTarget(target: String, nativeIp: String): Boolean {
         if (target.equals("localhost", ignoreCase = true)) return true
         if (target.equals("127.0.0.1", ignoreCase = true)) return true
         if (target.equals(nativeIp, ignoreCase = true)) return true
         if (target.equals("portal.local", ignoreCase = true)) return true
         if (target.equals("edge.local", ignoreCase = true)) return true
+        if (target.equals("manuals.playstation.net", ignoreCase = true)) return true
+        if (target.endsWith(".manuals.playstation.net", ignoreCase = true)) return true
+        if (target.equals("doc.dl.playstation.net", ignoreCase = true)) return true
         return false
     }
 
@@ -207,7 +245,8 @@ class LocalEdgeServer(
         rangeHeader: String?,
         output: BufferedOutputStream,
         clientIp: String,
-        nativeIp: String
+        nativeIp: String,
+        isPlayStation: Boolean = false
     ) {
         // Clean path and extract query params
         var cleanPath = rawPath
@@ -234,21 +273,9 @@ class LocalEdgeServer(
         }
 
         val docRoot = siteRootDir()
-        var targetFile = if (cleanPath == "/" || cleanPath.isEmpty()) {
-            File(docRoot, "index.html")
-        } else {
-            File(docRoot, cleanPath.removePrefix("/"))
-        }
+        val targetFile = resolveTargetFile(docRoot, cleanPath, isPlayStation)
 
-        // Single Page App (SPA) fallback: If file doesn't exist and has no extension, fallback to index.html
-        if (!targetFile.exists() || targetFile.isDirectory) {
-            val fallbackIndex = File(docRoot, "index.html")
-            if (fallbackIndex.exists()) {
-                targetFile = fallbackIndex
-            }
-        }
-
-        if (targetFile.exists() && targetFile.isFile) {
+        if (targetFile != null && targetFile.exists() && targetFile.isFile) {
             serveStaticFile(targetFile, rangeHeader, output)
             onLog(
                 RequestLog(
@@ -275,6 +302,195 @@ class LocalEdgeServer(
                 )
             )
         }
+    }
+
+    private fun resolveTargetFile(docRoot: File, rawCleanPath: String, isPlayStation: Boolean): File? {
+        val cleanPath = try {
+            URLDecoder.decode(rawCleanPath, "UTF-8")
+        } catch (e: Exception) {
+            rawCleanPath
+        }
+
+        // 1. Root path requested -> return index.html or index.htm
+        if (cleanPath == "/" || cleanPath.isEmpty()) {
+            return findIndexFile(docRoot)
+        }
+
+        val relativePath = cleanPath.removePrefix("/")
+
+        // 2. Direct lookup in docRoot
+        val directFile = File(docRoot, relativePath)
+        if (directFile.exists()) {
+            if (directFile.isDirectory) {
+                val indexInDir = findIndexFile(directFile)
+                if (indexInDir != null) return indexInDir
+            } else if (directFile.isFile) {
+                return directFile
+            }
+        }
+
+        // 3. Case-insensitive lookup for relativePath in docRoot (fixes Android Linux ext4 case-sensitivity issues)
+        val ciDirect = findFileCaseInsensitive(docRoot, relativePath)
+        if (ciDirect != null) {
+            if (ciDirect.isDirectory) {
+                val indexInDir = findIndexFile(ciDirect)
+                if (indexInDir != null) return indexInDir
+            } else if (ciDirect.isFile) {
+                return ciDirect
+            }
+        }
+
+        // 4. PlayStation path normalization (/document/{lang}/ps4/..., /document/{lang}/ps5/..., /doc/ps5/...)
+        if (isPlayStation) {
+            val subPath = when {
+                cleanPath.contains("/ps4/") -> cleanPath.substringAfter("/ps4/")
+                cleanPath.contains("/ps5/") -> cleanPath.substringAfter("/ps5/")
+                cleanPath.contains("/document/") -> cleanPath.substringAfter("/document/")
+                cleanPath.contains("/doc/") -> cleanPath.substringAfter("/doc/")
+                else -> cleanPath
+            }.removePrefix("/")
+
+            if (subPath.isEmpty()) {
+                return findIndexFile(docRoot)
+            }
+
+            // Check if subPath exists relative to docRoot (e.g. "subfolder/index.html", "karo.html", "goldhen/")
+            val subFile = File(docRoot, subPath)
+            if (subFile.exists()) {
+                if (subFile.isDirectory) {
+                    val indexInDir = findIndexFile(subFile)
+                    if (indexInDir != null) return indexInDir
+                } else if (subFile.isFile) {
+                    return subFile
+                }
+            }
+
+            // Case-insensitive lookup for subPath
+            val ciSub = findFileCaseInsensitive(docRoot, subPath)
+            if (ciSub != null) {
+                if (ciSub.isDirectory) {
+                    val indexInDir = findIndexFile(ciSub)
+                    if (indexInDir != null) return indexInDir
+                } else if (ciSub.isFile) {
+                    return ciSub
+                }
+            }
+
+            // If subPath is specifically requesting the main root index and nothing else
+            if (subPath.equals("index.html", ignoreCase = true) || subPath.equals("index.htm", ignoreCase = true)) {
+                return findIndexFile(docRoot)
+            }
+
+            // Check leaf filename directly in docRoot (flat search, e.g. "page2.html" or "exploit.js")
+            val leafName = subPath.substringAfterLast("/")
+            if (leafName.isNotEmpty()) {
+                val flatFile = File(docRoot, leafName)
+                if (flatFile.exists() && flatFile.isFile) {
+                    return flatFile
+                }
+                val ciFlat = findFileCaseInsensitive(docRoot, leafName)
+                if (ciFlat != null && ciFlat.isFile) {
+                    return ciFlat
+                }
+                val recFile = findFileRecursively(docRoot, leafName)
+                if (recFile != null && recFile.isFile) {
+                    return recFile
+                }
+            }
+        }
+
+        // 5. Generic recursive search by leaf filename if still not found
+        val leafName = relativePath.substringAfterLast("/")
+        if (leafName.isNotEmpty() && !leafName.equals("index.html", ignoreCase = true) && !leafName.equals("index.htm", ignoreCase = true)) {
+            val recFile = findFileRecursively(docRoot, leafName)
+            if (recFile != null && recFile.isFile) {
+                return recFile
+            }
+        }
+
+        // 6. SPA fallback: ONLY fallback if the path has NO file extension
+        // (e.g. /dashboard, /settings - typical for single-page app routers),
+        // NEVER fallback for files with extensions like .html, .js, .css, .bin!
+        val hasExtension = relativePath.substringAfterLast("/", "").contains(".")
+        if (!hasExtension) {
+            val fallbackIndex = findIndexFile(docRoot)
+            if (fallbackIndex != null) {
+                return fallbackIndex
+            }
+        }
+
+        return null
+    }
+
+    private fun findIndexFile(dir: File): File? {
+        val candidates = arrayOf("index.html", "index.htm", "Index.html", "INDEX.HTML", "INDEX.HTM")
+        for (candidate in candidates) {
+            val f = File(dir, candidate)
+            if (f.exists() && f.isFile) return f
+        }
+        return dir.listFiles()?.firstOrNull {
+            it.isFile && (it.name.equals("index.html", ignoreCase = true) || it.name.equals("index.htm", ignoreCase = true))
+        }
+    }
+
+    private fun findFileCaseInsensitive(baseDir: File, relativePath: String): File? {
+        val segments = relativePath.replace('\\', '/').split("/").filter { it.isNotEmpty() }
+        var current = baseDir
+        for (segment in segments) {
+            if (!current.exists() || !current.isDirectory) return null
+            val match = current.listFiles()?.firstOrNull { it.name.equals(segment, ignoreCase = true) }
+                ?: return null
+            current = match
+        }
+        return current
+    }
+
+    private fun findFileRecursively(dir: File, fileName: String): File? {
+        if (!dir.exists() || !dir.isDirectory) return null
+        return try {
+            dir.walkTopDown().firstOrNull { it.isFile && it.name.equals(fileName, ignoreCase = true) }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun serveNetcheckSuccess(output: BufferedOutputStream) {
+        val body = "OK\r\n"
+        val bytes = body.toByteArray(Charsets.UTF_8)
+        val header = (
+            "HTTP/1.1 200 OK\r\n" +
+            "Content-Type: text/plain; charset=UTF-8\r\n" +
+            "Content-Length: ${bytes.size}\r\n" +
+            "Connection: close\r\n\r\n"
+        ).toByteArray(Charsets.UTF_8)
+        output.write(header)
+        output.write(bytes)
+        output.flush()
+    }
+
+    private fun serveUpdateBlocker(output: BufferedOutputStream) {
+        val header = (
+            "HTTP/1.1 200 OK\r\n" +
+            "Content-Type: text/plain; charset=UTF-8\r\n" +
+            "Content-Length: 0\r\n" +
+            "Connection: close\r\n\r\n"
+        ).toByteArray(Charsets.UTF_8)
+        output.write(header)
+        output.flush()
+    }
+
+    private fun serveConnectNotSupported(output: BufferedOutputStream) {
+        val msg = "HTTPS proxy tunneling tidak didukung dalam mode offline intranet. Silakan buka situs HTTP atau gunakan menu Panduan Pengguna (User's Guide) pada PS4/PS5.\r\n"
+        val bytes = msg.toByteArray(Charsets.UTF_8)
+        val header = (
+            "HTTP/1.1 405 Method Not Allowed\r\n" +
+            "Content-Type: text/plain; charset=UTF-8\r\n" +
+            "Content-Length: ${bytes.size}\r\n" +
+            "Connection: close\r\n\r\n"
+        ).toByteArray(Charsets.UTF_8)
+        output.write(header)
+        output.write(bytes)
+        output.flush()
     }
 
     private fun servePacFile(output: BufferedOutputStream, nativeIp: String) {

@@ -19,5 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "HotspotWebKit"
+rootProject.name = "hotspot-webkit-ps4-ps5"
 include(":app")

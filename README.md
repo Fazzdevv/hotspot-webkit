@@ -1,4 +1,4 @@
-# Hotspot WebKit v0.1
+# Hotspot WebKit PS4-PS5
 
 [![Android Min SDK](https://img.shields.io/badge/Min%20SDK-26%2B%20%28Android%208.0%2B%29-brightgreen.svg)](https://developer.android.com)
 [![Target SDK](https://img.shields.io/badge/Target%20SDK-34%20%28Android%2014%29-blue.svg)](https://developer.android.com)
@@ -7,21 +7,23 @@
 [![Non-Root](https://img.shields.io/badge/Permissions-Non--Root%20Compatible-orange.svg)]()
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**Hotspot WebKit** adalah aplikasi Android mandiri (*autonomous edge server*) yang mengubah smartphone Android Anda menjadi **Localhost Web Server & Proxy Interceptor** berkecepatan tinggi tanpa memerlukan akses **Root**. 
+**Hotspot WebKit PS4-PS5** adalah aplikasi Android mandiri (*autonomous edge server*) yang mengubah smartphone Android Anda menjadi **Localhost Exploit Host & Web Server** berkecepatan tinggi tanpa memerlukan akses **Root**.
 
-Aplikasi ini dirancang khusus untuk skenario **Offline Intranet**, sistem informasi darurat, portal kampus/sekolah lokal, ujian offline, ataupun *captive landing page* yang dijalankan langsung dari hotspot portabel Android.
+Aplikasi ini dirancang khusus untuk skenario **Offline Exploit Hosting PS4 & PS5**, memuat payload/jailbreak lokal melalui menu **Panduan Pengguna (User's Guide)** atau **Browser Internet** langsung dari hotspot portabel Android.
 
 ---
 
 ## Fitur Utama
 
-- **Deteksi IP Native Hardware (Bukan Tebakan)**: Secara otomatis mengiterasi interface jaringan hardware Android (`ap0`, `wlan1`, `swlan0`, `softap`) untuk mendeteksi alamat IPv4 tethering yang sebenarnya secara akurat.
-- **Dynamic ZIP Package Host**: Dapat menjalankan website apa pun (HTML, CSS, JS, React/Vue build) cukup dengan mengimpor file `.zip` dari penyimpanan internal HP menggunakan *Android Storage Access Framework (SAF)*. Dilengkapi proteksi keamanan terhadap *Zip-Slip Vulnerability*.
-- **Proxy Interceptor (HTTP 302 Redirect)**: Menjalankan proxy lokal di Port `8080`. Saat klien membuka website apa pun di browser (misal: `google.com`, `detik.com`), lalu lintas langsung dibelokkan secara otomatis (*HTTP 302 Found*) ke website lokal dari file ZIP Anda.
-- **HTTP 206 Partial Content (Media Streaming)**: Mendukung pemutaran audio dan video dengan fitur *seeking* / *scrubbing* yang mulus langsung di browser klien.
-- **Modern Jetpack Compose UI**: Antarmuka bertema gelap (*Cyber Dark Slate*) yang elegan dengan indikator status beranimasi pulsasi, generator **QR Code instan**, tombol satu ketukan untuk salin IP/URL, serta **Live Traffic Radar** untuk memantau request klien secara real-time.
-- **Background Persistence (Foreground Service & WakeLock)**: Dilengkapi Android Foreground Service dengan `PowerManager.PARTIAL_WAKE_LOCK` dan `WifiManager.WifiLock` agar server tetap aktif melayani klien 24/7 meskipun layar HP dimatikan.
-- **WPAD / PAC Support**: Menyediakan endpoint script auto-config proxy di `/wpad.dat` dan `/proxy.pac`.
+- **All-Domain Direct Serving Engine (Wildcard 200 OK)**: Semua permintaan HTTP dari konsol (baik `manuals.playstation.net`, browser web, maupun URL lainnya) langsung disajikan dengan **`HTTP 200 OK`** dari file lokal `.zip` tanpa redirect 302, mencegah error sandbox domain dan loop redirect.
+- **Dukungan Penuh PS4 & PS5 User's Guide**: Memetakan path bahasa (`/document/{lang}/ps4/...` dan `/document/{lang}/ps5/...`) secara cerdas ke root berkas `.zip` kamu.
+- **Tes Koneksi PS4 & PS5 Sukses (`netcheck.playstation.net`)**: Merespons request netcheck PlayStation dengan `200 OK` sehingga tes koneksi internet saat setup jaringan di konsol selalu berstatus **Sukses**.
+- **Proteksi Update Sistem Otomatis (`update.playstation.net`)**: Memblokir pengecekan firmware update PlayStation secara aman agar konsol terhindar dari pembaruan sistem yang tidak diinginkan.
+- **Dynamic ZIP Package Host**: Dapat menjalankan website atau paket exploit apa pun (HTML, CSS, JS, bin payload) cukup dengan mengimpor file `.zip` dari penyimpanan internal HP menggunakan *Android Storage Access Framework (SAF)*. Dilengkapi proteksi keamanan terhadap *Zip-Slip Vulnerability*.
+- **Deteksi IP Native Hardware**: Secara otomatis mengiterasi interface jaringan hardware Android (`ap0`, `wlan1`, `swlan0`, `softap`) untuk mendeteksi alamat IPv4 tethering yang sebenarnya secara akurat.
+- **HTTP 206 Partial Content (Media Streaming)**: Mendukung pemutaran audio dan video dengan fitur *seeking* / *scrubbing* yang mulus.
+- **Modern Jetpack Compose UI**: Antarmuka bertema gelap (*Cyber Dark Slate*) dengan indikator status beranimasi pulsasi, generator **QR Code instan**, tombol satu ketukan untuk salin IP/URL, serta **Live Traffic Radar** untuk memantau request konsol secara real-time.
+- **Background Persistence (Foreground Service & WakeLock)**: Dilengkapi Android Foreground Service dengan `PowerManager.PARTIAL_WAKE_LOCK` dan `WifiManager.WifiLock` agar server tetap aktif melayani konsol 24/7 meskipun layar HP dimatikan.
 
 ---
 
@@ -43,46 +45,53 @@ Aplikasi ini dirancang khusus untuk skenario **Offline Intranet**, sistem inform
 │  │     - Native Interface Resolver (ap0, wlan1, swlan0)             │  │
 │  │                                                                  │  │
 │  │  2. Local Edge Server (Port 8080):                               │  │
-│  │     - Static Web Server + SPA Fallback                           │  │
-│  │     - HTTP 206 Range Streaming (Video/Audio)                     │  │
-│  │     - Interceptor: Catch external host -> 302 Redirect to Portal │  │
+│  │     - Wildcard Direct Serving Engine (HTTP 200 OK)               │  │
+│  │     - PlayStation Netcheck Responder (200 OK)                    │  │
+│  │     - PlayStation Update Blocker (200 OK Empty)                  │  │
+│  │     - Smart Path Resolver (PS4/PS5 User's Guide Normalizer)      │  │
 │  │                                                                  │  │
 │  │  3. Zip Package Manager:                                         │  │
 │  │     - SAF Uri Importer + Zip-Slip Guard Extraction               │  │
 │  │     - Auto-Mount to Document Root                                │  │
 │  │                                                                  │  │
 │  │  4. Realtime Traffic Radar:                                      │  │
-│  │     - Request telemetry & live client monitoring                 │  │
+│  │     - Request telemetry & live console monitoring                │  │
 │  └──────────────────────────────────────────────────────────────────┘  │
 └───────────────────────────────────┬────────────────────────────────────┘
-                                    │ Wi-Fi Hotspot (Port 8080)
-        ┌───────────────────────────┼───────────────────────────┐
-        ▼                           ▼                           ▼
-  [ Klien Android ]           [ Klien iPhone ]           [ Klien Laptop ]
-  Proxy: IP:8080              Proxy: IP:8080             Proxy: IP:8080
-  -> Redirect ke Portal       -> Redirect ke Portal      -> Redirect ke Portal
+                                    │ Wi-Fi Hotspot (Proxy: Port 8080)
+        ┌───────────────────────────┴───────────────────────────┐
+        ▼                                                       ▼
+   [ Konsol PS4 ]                                          [ Konsol PS5 ]
+   Proxy: IP_HP:8080                                       Proxy: IP_HP:8080
+   -> Panduan Pengguna (Direct 200 OK)                     -> Panduan Pengguna (Direct 200 OK)
+   -> Browser Internet (Direct 200 OK)                     -> Browser Internet (Direct 200 OK)
 ```
 
 ---
 
-## Panduan Penggunaan Cepat
+## Panduan Penggunaan
 
 ### 1. Di HP Android Server:
 1. Nyalakan **Hotspot Portabel / Tethering** di pengaturan Android Anda.
-2. Buka aplikasi **Hotspot WebKit**.
+2. Buka aplikasi **Hotspot WebKit PS4-PS5**.
 3. Periksa bagian **Hardware Network Interface**: aplikasi akan otomatis mendeteksi **IP Asli** (misal `192.168.43.1`) dan **Port 8080**.
-4. Tekan tombol **"Nyalakan Server & Proxy (Port 8080)"**.
-5. *(Opsional)* Tekan **"Import .ZIP Baru"** untuk memilih website kustom Anda dari storage HP.
+4. Tekan tombol **"Import .ZIP Baru"** untuk memilih website / paket exploit kustom Anda dari storage HP.
+5. Tekan tombol **"Nyalakan Server & Proxy (Port 8080)"**.
 
-### 2. Di Perangkat Klien (HP / Laptop Lain):
-1. Hubungkan perangkat klien ke Wi-Fi Hotspot Android tersebut.
-2. Buka pengaturan Wi-Fi pada klien, klik **Pengaturan Lanjutan (Advanced)**:
-   - **Proxy**: Pilih `Manual`
-   - **Proxy Hostname**: Masukkan alamat **IP Native** yang tampil di aplikasi
-   - **Proxy Port**: `8080`
-   - **Bypass**: Kosongkan
-3. Buka browser di klien, ketik alamat web apa saja (misal `google.com` atau `tes.com`).
-4. **Hasil**: Browser klien akan otomatis dibelokkan (*redirect*) langsung ke website lokal dari file ZIP Anda!
+### 2. Di Konsol PS4 atau PS5:
+1. Hubungkan konsol ke Hotspot Wi-Fi Android ini.
+2. Buka **Pengaturan (Settings)** > **Jaringan (Network)** > **Siapkan Koneksi Internet (Set Up Internet Connection)**.
+3. Pilih **Gunakan Wi-Fi** > Pilih mode **Khusus (Custom / Advanced Settings)**.
+4. Pada bagian **Server Proksi (Proxy Server)**:
+   - Pilih **Gunakan (Use)**
+   - **Alamat (Address/Host)**: Masukkan **IP Native** dari aplikasi (misal `192.168.43.1`)
+   - **Port**: `8080`
+5. Pengaturan lainnya (IP, DNS, MTU) biarkan **Otomatis (Automatic)**.
+6. **Membuka Website / Exploit**:
+   - Di PS4: Buka menu **Pengaturan** > **Panduan Pengguna / Informasi Bermanfaat** > **Panduan Pengguna (User's Guide)**.
+   - Di PS5: Buka menu **Pengaturan** > **Panduan & Kiat, Kesehatan & Keselamatan, dan Informasi Lainnya** > **Panduan Pengguna (User's Guide)**.
+   - *(Atau buka Browser Internet dan ketik URL apa saja)*.
+7. **Hasil**: Halaman HTML dan seluruh aset dari file `.ZIP` Anda akan langsung terbuka secara instan (*Direct 200 OK*) tanpa error domain ataupun loop redirect!
 
 ---
 
@@ -101,34 +110,7 @@ cd hotspot-webkit
 # Build APK Debug
 ./gradlew assembleDebug
 ```
-File APK hasil build akan berada di `app/build/outputs/apk/debug/app-debug.apk`.
-
----
-
-## Struktur Direktori Proyek
-
-```
-hotspot-webkit/
-├── app/
-│   ├── src/main/
-│   │   ├── java/com/fazzdev/offlineedgeportal/
-│   │   │   ├── core/
-│   │   │   │   ├── NetworkUtils.kt          # Resolusi hardware IP native
-│   │   │   │   ├── LocalEdgeServer.kt       # Web server & 302 Proxy interceptor
-│   │   │   │   └── ZipPackageManager.kt     # Handler ekstraksi & mount ZIP aman
-│   │   │   ├── service/
-│   │   │   │   └── EdgeServerService.kt     # Foreground Service & WakeLock
-│   │   │   └── ui/
-│   │   │       ├── MainActivity.kt          # Activity & SAF Picker launcher
-│   │   │       ├── MainViewModel.kt         # Reactive state & logic
-│   │   │       ├── screens/DashboardScreen.kt # Compose UI Dashboard
-│   │   │       └── util/QRCodeGenerator.kt  # Generator QR Code
-│   │   ├── res/                             # Resource layout, strings, icons
-│   │   └── AndroidManifest.xml
-│   └── build.gradle.kts
-├── settings.gradle.kts
-└── build.gradle.kts
-```
+File APK hasil build akan berada di `app/build/outputs/apk/debug/app-debug.apk` atau folder `release/hotspot-webkit-v0.1.apk`.
 
 ---
 
