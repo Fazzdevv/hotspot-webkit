@@ -11,3 +11,5 @@
 *.aab
 app/build/
 !release/*.apk
+.env
+*.env
