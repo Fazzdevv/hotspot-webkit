@@ -135,12 +135,19 @@ object AppStrings {
         val radarTitle: String
         val radarEmpty: String
         val btnClearRadar: String
+
+        // PKG Log Console
+        val pkgLogTitle: String
+        val pkgLogEmpty: String
+        val btnClearPkgLog: String
+        val btnCopyPkgLog: String
+        val toastCopiedPkgLogs: String
     }
 
     private object IndonesianStrings : Strings {
         override val appTitle = "Hotspot WebKit PS4-PS5"
         override val appSubtitle = "Offline Exploit Host & Edge Server (Non-Root)"
-        override val appVersion = "v1.1"
+        override val appVersion = "v1.2"
 
         override val tabWebKit = "WebKit Exploit"
         override val tabPkg = "PS4 PKG Sender"
@@ -238,12 +245,18 @@ object AppStrings {
         override val radarTitle = "Live Traffic Radar"
         override val radarEmpty = "Belum ada trafik dari konsol..."
         override val btnClearRadar = "Bersihkan Log"
+
+        override val pkgLogTitle = "Console Log PKG Sender"
+        override val pkgLogEmpty = "Belum ada riwayat aktivitas pengiriman PKG..."
+        override val btnClearPkgLog = "Bersihkan Log"
+        override val btnCopyPkgLog = "Salin Log"
+        override val toastCopiedPkgLogs = "Log pengiriman berhasil disalin ke clipboard"
     }
 
     private object EnglishStrings : Strings {
         override val appTitle = "Hotspot WebKit PS4-PS5"
         override val appSubtitle = "Offline Exploit Host & Edge Server (Non-Root)"
-        override val appVersion = "v1.1"
+        override val appVersion = "v1.2"
 
         override val tabWebKit = "WebKit Exploit"
         override val tabPkg = "PS4 PKG Sender"
@@ -341,5 +354,11 @@ object AppStrings {
         override val radarTitle = "Live Traffic Radar"
         override val radarEmpty = "No traffic recorded from console yet..."
         override val btnClearRadar = "Clear Logs"
+
+        override val pkgLogTitle = "PKG Sender Console Log"
+        override val pkgLogEmpty = "No PKG sender activity recorded yet..."
+        override val btnClearPkgLog = "Clear Logs"
+        override val btnCopyPkgLog = "Copy Logs"
+        override val toastCopiedPkgLogs = "PKG logs copied to clipboard"
     }
 }

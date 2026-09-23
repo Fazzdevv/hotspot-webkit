@@ -1,6 +1,6 @@
 # Hotspot WebKit PS4-PS5
 
-[![Latest Release](https://img.shields.io/badge/Release-v1.1-blue.svg)](https://github.com/Fazzdevv/hotspot-webkit/releases/tag/v1.1)
+[![Latest Release](https://img.shields.io/badge/Release-v1.2-blue.svg)](https://github.com/Fazzdevv/hotspot-webkit/releases/tag/v1.2)
 [![Android Min SDK](https://img.shields.io/badge/Min%20SDK-26%2B%20%28Android%208.0%2B%29-brightgreen.svg)](https://developer.android.com)
 [![Target SDK](https://img.shields.io/badge/Target%20SDK-34%20%28Android%2014%29-blue.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-purple.svg)](https://kotlinlang.org)
@@ -16,35 +16,44 @@ Aplikasi ini dirancang khusus untuk komunitas PlayStation (PS4 & PS5) dengan dua
 
 ---
 
-## 🚀 Fitur Utama di v1.1
+## 🚀 Fitur Utama di v1.2
 
-### 1. Dual-Tab Navigation & Server Saling Eksklusif (Mutually Exclusive)
+### 1. PKG Sender Live Console Log & Diagnostik Real-Time
+- **Console Log Interaktif**: Terminal monitoring proses pengiriman payload GoldHEN 9090 dan aktivitas unduhan PS4 secara live di tab PKG Sender.
+- **Deteksi Cerdas Error Port 9090**: Diagnosa penyebab error otomatis (misal: BinLoader belum aktif, IP PS4 salah, atau timeout) dengan tingkat level berwarna (`[INFO]`, `[OK]`, `[WARN]`, `[ERR]`).
+- **Aksi Cepat Salin & Bersihkan**: Tombol Salin Log ke clipboard dan Bersihkan riwayat log.
+
+### 2. Peningkatan Performa Throughput & Buffer 512 KB
+- **TCP Socket Tuning**: Menonaktifkan algoritma Nagle (`tcpNoDelay = true`) dan memperbesar TCP Send Buffer menjadi **1 MB**.
+- **Buffer Streaming 512 KB**: Pengaliran file raksasa dengan throughput maksimal di jaringan Wi-Fi Hotspot 5GHz tanpa lag.
+- **Pembersihan URL Manifest**: Mencegah error `0x80433060` (`SCE_HTTP_ERROR_INVALID_URL`) pada background download manager PS4 (BGFT/PlayGo).
+
+### 3. Dual-Tab Navigation & Server Saling Eksklusif (Mutually Exclusive)
 - Layar dashboard dibagi menjadi dua tab terisolasi: **`[ 🌐 WebKit Exploit ]`** dan **`[ 🎮 PS4 PKG Sender ]`**.
 - **Server Safety Isolation**: Mengaktifkan server WebKit otomatis mematikan mode server PKG, dan sebaliknya. Keduanya berbagi port 8080 secara dinamis tanpa tabrakan port (`bind address in use`).
 
-### 2. PS4 PKG Installer & Sender (GoldHEN Port 9090)
+### 4. PS4 PKG Installer & Sender (GoldHEN Port 9090)
 - **GoldHEN BinLoader Integration**: Injeksi payload 16 KB resmi via socket port 9090 dengan patching Little-Endian otomatis.
 - **PlayGo JSON Manifest Generator (`/json/{id}.json`)**: Menghasilkan manifest potongan paket yang kompatibel 100% dengan download manager PlayStation 4.
 - **Deterministic ID SHA-256 (`PkgIdentifier`)**: Identifikasi berkas PKG berbasis hash Sony package digest (`0xFE0`), Title ID, Content ID, dan ukuran byte.
 - **Smart 8-Layer Fallback Matching**: Mencegah HTTP 404 saat pause/resume unduhan di menu Notifikasi PS4.
-- **Buffer Streaming 256 KB (`206 Partial Content`)**: Pengaliran file raksasa (hingga puluhan GB) dengan latensi ultra-rendah dan throughput tinggi melalui Android SAF (`ParcelFileDescriptor`).
 - **UI Minimalis & Modern**: Tombol aksi seimbang `[ ➢ Kirim ke PS4 ]` dan `[ ☁ Taruh di Server ]` (untuk melanjutkan unduhan atau mengatasi error `0x80990086`).
 
-### 3. Dynamic Web Ripper / Auto-Cache (Clone Web Exploit)
+### 5. Dynamic Web Ripper / Auto-Cache (Clone Web Exploit)
 - Kloning dan unduh website exploit online langsung dari URL (misal Karo Exploit, KME PS4) tanpa perlu membuat file `.zip` manual.
 - Seluruh aset HTML, CSS, JS, dan gambar diunduh paralel dan otomatis disajikan secara offline dari memori internal HP.
 
-### 4. Multilingual Support (Bilingual ID 🇮🇩 / EN 🇬🇧)
+### 6. Multilingual Support (Bilingual ID 🇮🇩 / EN 🇬🇧)
 - Pengalih bahasa instan di header aplikasi antara Bahasa Indonesia dan Bahasa Inggris dengan penyimpanan preferensi persisten.
 
-### 5. All-Domain Direct Serving Engine (Wildcard 200 OK)
+### 7. All-Domain Direct Serving Engine (Wildcard 200 OK)
 - Semua permintaan HTTP dari konsol (baik `manuals.playstation.net`, browser web, maupun domain publik) langsung disajikan dengan **`HTTP 200 OK`** tanpa redirect 302, mencegah error domain sandbox pada browser konsol.
 
-### 6. Proteksi Jaringan PlayStation
+### 8. Proteksi Jaringan PlayStation
 - **Tes Koneksi PS4 & PS5 Sukses (`netcheck.playstation.net`)**: Tes koneksi internet saat konfigurasi Wi-Fi selalu sukses.
 - **Proteksi Update Sistem Otomatis (`update.playstation.net`)**: Memblokir pengecekan firmware update PlayStation secara aman agar konsol terhindar dari pembaruan firmware yang tidak diinginkan.
 
-### 7. Modern Jetpack Compose UI & Background Persistence
+### 9. Modern Jetpack Compose UI & Background Persistence
 - Antarmuka bertema gelap (*Cyber Dark Slate*) dengan monitor kecepatan transfer live (MB/s), counter byte terkirim, generator QR code, serta **Live Traffic Radar**.
 - Berjalan stabil di latar belakang (*Foreground Service*) dengan `PowerManager.PARTIAL_WAKE_LOCK` dan `WifiManager.WifiLock` sehingga server tetap aktif 24/7 meskipun layar HP dimatikan.
 
@@ -80,10 +89,11 @@ Aplikasi ini dirancang khusus untuk komunitas PlayStation (PS4 & PS5) dengan dua
 
 | Versi | Berkas APK | Keterangan |
 | :--- | :--- | :--- |
-| **v1.1 (Terbaru)** | [**hotspot-webkit-ps4-ps5-v1.1.apk**](https://github.com/Fazzdevv/hotspot-webkit/releases/download/v1.1/hotspot-webkit-ps4-ps5-v1.1.apk) | Dual-Tab UI, PKG Sender GoldHEN Port 9090, Web Ripper, Mutually Exclusive Servers |
+| **v1.2 (Terbaru)** | [**hotspot-webkit-ps4-ps5-v1.2.apk**](https://github.com/Fazzdevv/hotspot-webkit/releases/download/v1.2/hotspot-webkit-ps4-ps5-v1.2.apk) | PKG Live Console Log, Fix BGFT Error 0x80433060, 512KB Buffer + 1MB TCP Tuning |
+| **v1.1** | [hotspot-webkit-ps4-ps5-v1.1.apk](https://github.com/Fazzdevv/hotspot-webkit/releases/download/v1.1/hotspot-webkit-ps4-ps5-v1.1.apk) | Dual-Tab UI, PKG Sender GoldHEN Port 9090, Web Ripper, Mutually Exclusive Servers |
 | **v1.0** | [hotspot-webkit-ps4-ps5-v1.0.apk](https://github.com/Fazzdevv/hotspot-webkit/releases/download/v1.0/hotspot-webkit-ps4-ps5-v1.0.apk) | All-Domain Direct Serving Engine, Wildcard Proxy, Offline Exploit Portal |
 
-Berkas APK lokal juga tersedia langsung di repositori pada folder [`release/hotspot-webkit-ps4-ps5-v1.1.apk`](release/hotspot-webkit-ps4-ps5-v1.1.apk) dan [`release/hotspot-webkit-ps4-ps5.apk`](release/hotspot-webkit-ps4-ps5.apk).
+Berkas APK lokal juga tersedia langsung di repositori pada folder [`release/hotspot-webkit-ps4-ps5-v1.2.apk`](release/hotspot-webkit-ps4-ps5-v1.2.apk) dan [`release/hotspot-webkit-ps4-ps5.apk`](release/hotspot-webkit-ps4-ps5.apk).
 
 ---
 

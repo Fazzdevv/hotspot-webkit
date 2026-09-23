@@ -89,6 +89,8 @@ class LocalEdgeServer(
     private fun handleClientSocket(socket: Socket) {
         val clientIp = socket.inetAddress?.hostAddress ?: "Unknown"
         try {
+            socket.tcpNoDelay = true
+            socket.sendBufferSize = 1024 * 1024
             socket.soTimeout = 8000
             val input = BufferedInputStream(socket.getInputStream())
             val output = BufferedOutputStream(socket.getOutputStream())
@@ -189,13 +191,14 @@ class LocalEdgeServer(
             // Semua link / domain HTTP apa pun (google.com, manuals.playstation.net, detik.com, dll.)
             // langsung di-handle dan disajikan dengan HTTP 200 OK dari website lokal tanpa redirect 302!
             val isPs = isPlayStationUserGuide(lowerHost, lowerUrl)
+            val cleanHost = hostHeader.substringBefore(":").ifEmpty { nativeIp.substringBefore(":") }
             handleLocalRequest(
                 method = method,
                 rawPath = fullUrlOrPath,
                 rangeHeader = rangeHeader,
                 output = output,
                 clientIp = clientIp,
-                nativeIp = hostHeader.ifEmpty { nativeIp },
+                nativeIp = cleanHost,
                 isPlayStation = isPs
             )
         } catch (e: Exception) {
@@ -592,12 +595,13 @@ class LocalEdgeServer(
     }
 
     private fun servePacFile(output: BufferedOutputStream, nativeIp: String) {
+        val cleanHost = nativeIp.substringBefore(":")
         val pacScript = """
             function FindProxyForURL(url, host) {
-                if (shExpMatch(host, "$nativeIp") || shExpMatch(host, "127.0.0.1") || shExpMatch(host, "localhost")) {
+                if (shExpMatch(host, "$cleanHost") || shExpMatch(host, "127.0.0.1") || shExpMatch(host, "localhost")) {
                     return "DIRECT";
                 }
-                return "PROXY $nativeIp:$port; DIRECT";
+                return "PROXY $cleanHost:$port; DIRECT";
             }
         """.trimIndent()
 
@@ -615,9 +619,8 @@ class LocalEdgeServer(
     }
 
     private fun servePlayGoManifest(file: PkgFile, nativeIp: String, output: BufferedOutputStream) {
-        val filename = if (file.name.endsWith(".pkg", ignoreCase = true)) file.name else "${file.name}.pkg"
-        val encodedName = URLDecoder.decode(filename, "UTF-8").let { URLEncoder.encode(it, "UTF-8").replace("+", "%20") }
-        val pieceUrl = "http://$nativeIp:$port/pkg/${file.id}/$encodedName"
+        val cleanHost = nativeIp.substringBefore(":")
+        val pieceUrl = "http://$cleanHost:$port/pkg/${file.id}/${file.id}.pkg"
         val digest = file.packageDigest ?: "0000000000000000000000000000000000000000000000000000000000000000"
         val manifestJson = "{\"originalFileSize\":${file.sizeBytes},\"packageDigest\":\"$digest\",\"numberOfSplitFiles\":1,\"pieces\":[{\"fileOffset\":0,\"fileSize\":${file.sizeBytes},\"url\":\"$pieceUrl\",\"hashValue\":\"0000000000000000000000000000000000000000\"}]}"
         val jsonBytes = manifestJson.toByteArray(Charsets.UTF_8)
@@ -753,6 +756,7 @@ class LocalEdgeServer(
     }
 
     private fun servePkgServerStatusPage(output: BufferedOutputStream, nativeIp: String) {
+        val cleanHost = nativeIp.substringBefore(":")
         val html = """
             <!DOCTYPE html>
             <html>
@@ -770,7 +774,7 @@ class LocalEdgeServer(
             </head>
             <body>
                 <div class="card">
-                    <div class="badge">SERVER ACTIVE ($nativeIp:8080)</div>
+                    <div class="badge">SERVER ACTIVE ($cleanHost:$port)</div>
                     <h1>PS4 PKG Sender Server</h1>
                     <p>Server is ready to stream .pkg files to your PlayStation 4 console via GoldHEN Port 9090.</p>
                 </div>

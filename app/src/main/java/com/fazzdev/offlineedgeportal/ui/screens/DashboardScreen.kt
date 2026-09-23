@@ -17,6 +17,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -68,6 +70,7 @@ import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -90,6 +93,8 @@ import com.fazzdev.offlineedgeportal.core.RipProgress
 import com.fazzdev.offlineedgeportal.core.ServerActiveMode
 import com.fazzdev.offlineedgeportal.core.SitePackageInfo
 import com.fazzdev.offlineedgeportal.pkg.model.PkgFile
+import com.fazzdev.offlineedgeportal.pkg.model.PkgLogEntry
+import com.fazzdev.offlineedgeportal.pkg.model.PkgLogLevel
 import com.fazzdev.offlineedgeportal.ui.MainDashboardTab
 import com.fazzdev.offlineedgeportal.ui.MainViewModel
 import com.fazzdev.offlineedgeportal.ui.theme.AmberWarning
@@ -138,6 +143,7 @@ fun DashboardScreen(
     val pkgTransferStatus by viewModel.pkgTransferStatus.collectAsState()
     val transferredBytes by viewModel.transferredBytes.collectAsState()
     val speedBytes by viewModel.transferSpeedBytes.collectAsState()
+    val pkgLogs by viewModel.pkgLogs.collectAsState()
 
     val portalUrl = "http://${serverState.nativeIp}:${serverState.port}/"
     val qrBitmap = remember(serverState.nativeIp, serverState.port) {
@@ -295,6 +301,16 @@ fun DashboardScreen(
                     onRemovePkg = { viewModel.removePkgFile(it) },
                     onSendToPs4 = { viewModel.sendPkgToPs4(context) },
                     onHostOnly = { viewModel.hostPkgOnServerOnly(context) }
+                )
+            }
+
+            // PKG Sender Live Console Log Card
+            item {
+                PkgLogConsoleCard(
+                    logs = pkgLogs,
+                    strings = strings,
+                    onClear = { viewModel.clearPkgLogs() },
+                    onCopy = { viewModel.copyPkgLogsToClipboard(context, strings) }
                 )
             }
 
@@ -1541,6 +1557,156 @@ fun TrafficLogsCard(
                                 color = TextMuted,
                                 fontSize = 10.sp
                             )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PkgLogConsoleCard(
+    logs: List<PkgLogEntry>,
+    strings: AppStrings.Strings,
+    onClear: () -> Unit,
+    onCopy: () -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = DarkSlateSurface),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "${strings.pkgLogTitle} (${logs.size})",
+                    color = TextPrimary,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                if (logs.isNotEmpty()) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        IconButton(onClick = onCopy, modifier = Modifier.size(28.dp)) {
+                            Icon(
+                                imageVector = Icons.Default.ContentCopy,
+                                contentDescription = strings.btnCopyPkgLog,
+                                tint = CyberCyan,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        IconButton(onClick = onClear, modifier = Modifier.size(28.dp)) {
+                            Icon(
+                                imageVector = Icons.Default.DeleteSweep,
+                                contentDescription = strings.btnClearPkgLog,
+                                tint = TextMuted,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            if (logs.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(80.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(DarkNavyBg),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = strings.pkgLogEmpty,
+                        color = TextMuted,
+                        fontSize = 12.sp
+                    )
+                }
+            } else {
+                val scrollState = rememberScrollState()
+                LaunchedEffect(logs.size) {
+                    scrollState.animateScrollTo(scrollState.maxValue)
+                }
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 100.dp, max = 260.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(DarkNavyBg)
+                        .padding(10.dp)
+                        .verticalScroll(scrollState),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    val timeFormat = remember { SimpleDateFormat("HH:mm:ss", Locale.getDefault()) }
+                    logs.forEach { log ->
+                        val (tagText, tagBg, tagColor) = when (log.level) {
+                            PkgLogLevel.SUCCESS -> Triple("OK", NeonGreen.copy(alpha = 0.15f), NeonGreen)
+                            PkgLogLevel.WARN -> Triple("WARN", AmberWarning.copy(alpha = 0.15f), AmberWarning)
+                            PkgLogLevel.ERROR -> Triple("ERR", CrimsonAlert.copy(alpha = 0.2f), CrimsonAlert)
+                            PkgLogLevel.INFO -> Triple("INFO", CyberCyan.copy(alpha = 0.15f), CyberCyan)
+                        }
+
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Text(
+                                    text = timeFormat.format(Date(log.timestamp)),
+                                    color = TextMuted,
+                                    fontSize = 10.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    modifier = Modifier.padding(top = 1.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(tagBg)
+                                        .padding(horizontal = 4.dp, vertical = 1.dp)
+                                ) {
+                                    Text(
+                                        text = tagText,
+                                        color = tagColor,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = log.message,
+                                    color = when (log.level) {
+                                        PkgLogLevel.ERROR -> CrimsonAlert
+                                        PkgLogLevel.WARN -> AmberWarning
+                                        PkgLogLevel.SUCCESS -> TextPrimary
+                                        PkgLogLevel.INFO -> TextSecondary
+                                    },
+                                    fontSize = 11.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            if (!log.details.isNullOrBlank()) {
+                                Text(
+                                    text = log.details,
+                                    color = TextMuted,
+                                    fontSize = 9.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    modifier = Modifier.padding(start = 58.dp, top = 2.dp)
+                                )
+                            }
                         }
                     }
                 }

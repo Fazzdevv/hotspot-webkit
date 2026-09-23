@@ -12,12 +12,15 @@ import com.fazzdev.offlineedgeportal.core.SitePackageInfo
 import com.fazzdev.offlineedgeportal.core.WebRipperEngine
 import com.fazzdev.offlineedgeportal.core.ZipPackageManager
 import com.fazzdev.offlineedgeportal.pkg.model.PkgFile
+import com.fazzdev.offlineedgeportal.pkg.model.PkgLogEntry
+import com.fazzdev.offlineedgeportal.pkg.model.PkgLogLevel
 import com.fazzdev.offlineedgeportal.pkg.network.GoldHenPayloadService
 import com.fazzdev.offlineedgeportal.pkg.server.PkgRegistry
 import com.fazzdev.offlineedgeportal.pkg.util.PkgHeaderParser
 import com.fazzdev.offlineedgeportal.pkg.util.PkgIdentifier
 import com.fazzdev.offlineedgeportal.service.EdgeServerService
 import com.fazzdev.offlineedgeportal.ui.util.AppLanguage
+import com.fazzdev.offlineedgeportal.ui.util.AppStrings
 import com.fazzdev.offlineedgeportal.ui.util.LanguagePreferences
 import com.fazzdev.offlineedgeportal.core.ServerActiveMode
 import kotlinx.coroutines.Dispatchers
@@ -87,10 +90,46 @@ class MainViewModel : ViewModel() {
     private val _trafficLogs = MutableStateFlow<List<RequestLog>>(emptyList())
     val trafficLogs = _trafficLogs.asStateFlow()
 
+    // PKG Sender Logs State
+    private val _pkgLogs = MutableStateFlow<List<PkgLogEntry>>(emptyList())
+    val pkgLogs = _pkgLogs.asStateFlow()
+
+    fun addPkgLog(message: String, level: PkgLogLevel = PkgLogLevel.INFO, details: String? = null) {
+        val entry = PkgLogEntry(
+            message = message,
+            level = level,
+            details = details
+        )
+        val current = _pkgLogs.value.toMutableList()
+        current.add(entry)
+        if (current.size > 200) {
+            current.removeAt(0)
+        }
+        _pkgLogs.value = current
+    }
+
+    fun clearPkgLogs() {
+        _pkgLogs.value = emptyList()
+    }
+
+    fun copyPkgLogsToClipboard(context: Context, strings: AppStrings.Strings) {
+        val text = _pkgLogs.value.joinToString("\n") { entry ->
+            val time = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(entry.timestamp))
+            "[$time] [${entry.level.name}] ${entry.message}" + if (!entry.details.isNullOrBlank()) "\nDetails: ${entry.details}" else ""
+        }
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        val clip = android.content.ClipData.newPlainText("PKG Sender Logs", text)
+        clipboard.setPrimaryClip(clip)
+        android.widget.Toast.makeText(context, strings.toastCopiedPkgLogs, android.widget.Toast.LENGTH_SHORT).show()
+    }
+
     init {
         refreshNetworkInterfaces()
         observeLogs()
         startTransferMonitor()
+        GoldHenPayloadService.onLogEntry = { entry ->
+            addPkgLog(entry.message, entry.level, entry.details)
+        }
     }
 
     fun loadInitialSettings(context: Context) {
@@ -255,16 +294,26 @@ class MainViewModel : ViewModel() {
         }
 
         val targetIp = _ps4TargetIp.value.trim()
-        val localIp = serverState.value.nativeIp
-        val port = serverState.value.port
+        val detectedHotspot = NetworkUtils.getActiveHotspotInfo()
+        val rawLocalIp = when {
+            detectedHotspot != null && detectedHotspot.ipAddress != "127.0.0.1" -> detectedHotspot.ipAddress
+            current.nativeIp != "127.0.0.1" -> current.nativeIp
+            else -> "192.168.43.1"
+        }
+        val cleanLocalIp = rawLocalIp.substringBefore(":")
+        val port = if (current.port > 0) current.port else 8080
 
         val manifestUrls = files.map { file ->
-            "http://$localIp:$port/json/${file.id}.json"
+            "http://$cleanLocalIp:$port/json/${file.id}.json"
         }
 
         viewModelScope.launch(Dispatchers.IO) {
             _isSendingPkg.value = true
             PkgRegistry.resetSession()
+
+            addPkgLog("=====================================", PkgLogLevel.INFO)
+            addPkgLog("Sesi Baru: Mengirim ${files.size} paket ke PS4 $targetIp:9090", PkgLogLevel.INFO)
+            addPkgLog("IP Server HP: $cleanLocalIp:$port", PkgLogLevel.INFO)
 
             _pkgTransferStatus.value = if (_currentLanguage.value == AppLanguage.ID) {
                 "Menginjeksi payload 16KB ke GoldHEN 9090 di $targetIp..."
@@ -276,10 +325,14 @@ class MainViewModel : ViewModel() {
                 _pkgTransferStatus.value = msg
             }
 
+            GoldHenPayloadService.onLogEntry = { entry ->
+                addPkgLog(entry.message, entry.level, entry.details)
+            }
+
             val result = GoldHenPayloadService.sendPkgPayload(
                 context = context,
                 ps4Ip = targetIp,
-                localIp = localIp,
+                localIp = cleanLocalIp,
                 files = files,
                 packageUrls = manifestUrls
             )
@@ -335,6 +388,12 @@ class MainViewModel : ViewModel() {
                     current.removeAt(current.lastIndex)
                 }
                 _trafficLogs.value = current
+
+                // If this is a PKG download or manifest request, also log to PKG Console
+                if (log.uri.startsWith("/json/") || log.uri.startsWith("/pkg/")) {
+                    val lvl = if (log.statusCode in 200..299) PkgLogLevel.SUCCESS else PkgLogLevel.WARN
+                    addPkgLog("HTTP ${log.statusCode}: ${log.method} ${log.uri} (${log.clientIp})", lvl)
+                }
             }
         }
     }

@@ -17,7 +17,7 @@ import java.nio.channels.WritableByteChannel
 object ContentRangeStreamer {
 
     private const val TAG = "ContentRangeStreamer"
-    private const val BUFFER_SIZE = 256 * 1024 // 256 KB buffer for high-throughput PS4 transfers
+    private const val BUFFER_SIZE = 512 * 1024 // 512 KB buffer for high-throughput PS4 transfers
 
     data class Range(val start: Long, val end: Long, val total: Long) {
         val length: Long get() = end - start + 1

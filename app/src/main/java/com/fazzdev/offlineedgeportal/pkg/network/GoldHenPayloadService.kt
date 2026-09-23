@@ -2,7 +2,10 @@ package com.fazzdev.offlineedgeportal.pkg.network
 
 import android.content.Context
 import android.util.Log
+import com.fazzdev.offlineedgeportal.core.NetworkUtils
 import com.fazzdev.offlineedgeportal.pkg.model.PkgFile
+import com.fazzdev.offlineedgeportal.pkg.model.PkgLogEntry
+import com.fazzdev.offlineedgeportal.pkg.model.PkgLogLevel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.InetAddress
@@ -32,10 +35,22 @@ object GoldHenPayloadService {
     )
 
     var onLogMessage: ((String) -> Unit)? = null
+    var onLogEntry: ((PkgLogEntry) -> Unit)? = null
 
-    private fun log(message: String) {
-        Log.i(TAG, message)
+    private fun log(message: String, level: PkgLogLevel = PkgLogLevel.INFO, details: String? = null) {
+        when (level) {
+            PkgLogLevel.ERROR -> Log.e(TAG, message)
+            PkgLogLevel.WARN -> Log.w(TAG, message)
+            else -> Log.i(TAG, message)
+        }
         onLogMessage?.invoke(message)
+        onLogEntry?.invoke(
+            PkgLogEntry(
+                level = level,
+                message = message,
+                details = details
+            )
+        )
     }
 
     /**
@@ -137,12 +152,13 @@ object GoldHenPayloadService {
 
     /**
      * Executes the entire GoldHEN Payload installation workflow on Port 9090:
-     * 1. Opens local ServerSocket on dynamic port.
-     * 2. Patches payload with phone IP & callback port.
-     * 3. Injects payload into PS4 Port 9090 (GoldHEN BinLoader).
-     * 4. Waits for PS4 to connect back (up to 15s).
-     * 5. Sends package data for all queued files.
-     * 6. Sends clean exit signal (0) and closes.
+     * 1. Resolves valid Hotspot IPv4 address for phone callback.
+     * 2. Opens dynamic local ServerSocket listening on 0.0.0.0 wildcard.
+     * 3. Patches 16KB payload with phone IP & callback port.
+     * 4. Injects payload into PS4 Port 9090 (GoldHEN BinLoader).
+     * 5. Waits for PS4 to connect back (up to 15s).
+     * 6. Sends package data for all queued files.
+     * 7. Sends clean exit signal (0) and closes.
      */
     suspend fun sendPkgPayload(
         context: Context,
@@ -152,49 +168,85 @@ object GoldHenPayloadService {
         packageUrls: List<String>
     ): Result<String> = withContext(Dispatchers.IO) {
         if (files.isEmpty() || packageUrls.isEmpty()) {
-            return@withContext Result.failure(IllegalArgumentException("Daftar berkas PKG kosong"))
+            val err = "Daftar berkas PKG kosong"
+            log(err, PkgLogLevel.ERROR)
+            return@withContext Result.failure(IllegalArgumentException(err))
         }
 
-        // 1. Open dynamic local server socket
+        // 1. Resolve effective local IP reachable from PS4
+        val effectiveLocalIp = if (localIp.isBlank() || localIp == "127.0.0.1") {
+            val autoDetected = NetworkUtils.getActiveHotspotInfo()?.ipAddress
+            if (autoDetected != null && autoDetected != "127.0.0.1") {
+                log("IP lokal dialihkan otomatis dari loopback ke hotspot: $autoDetected", PkgLogLevel.WARN)
+                autoDetected
+            } else {
+                log("PERINGATAN: Tidak mendeteksi IP hotspot aktif. Menggunakan default 192.168.43.1", PkgLogLevel.WARN)
+                "192.168.43.1"
+            }
+        } else {
+            localIp
+        }
+
+        log("Memulai pengiriman payload ke PS4: $ps4Ip:9090 (IP Balik HP: $effectiveLocalIp)", PkgLogLevel.INFO)
+
+        // 2. Open dynamic local server socket on wildcard 0.0.0.0 to accept connections on any interface
         val serverSocket = try {
-            ServerSocket(0, 5, InetAddress.getByName(localIp)).apply {
+            ServerSocket(0, 5, InetAddress.getByName("0.0.0.0")).apply {
                 soTimeout = 15000 // 15 seconds timeout waiting for PS4
             }
         } catch (e: Exception) {
-            return@withContext Result.failure(Exception("Gagal membuka socket server lokal di $localIp: ${e.message}"))
+            val errMsg = "Gagal membuka socket server callback: ${e.message}"
+            log(errMsg, PkgLogLevel.ERROR, e.stackTraceToString())
+            return@withContext Result.failure(Exception(errMsg))
         }
 
         val localPort = serverSocket.localPort
-        log("Local GoldHEN callback server listening on $localIp:$localPort")
+        log("Server callback lokal siap di port $localPort (0.0.0.0:$localPort)", PkgLogLevel.SUCCESS)
 
         try {
-            // 2. Load and patch raw payload from assets
+            // 3. Load and patch raw payload from assets
             val rawPayload = try {
                 context.assets.open(PAYLOAD_ASSET_NAME).use { it.readBytes() }
             } catch (e: Exception) {
-                return@withContext Result.failure(Exception("Berkas $PAYLOAD_ASSET_NAME tidak ditemukan di assets: ${e.message}"))
+                val errMsg = "Berkas $PAYLOAD_ASSET_NAME tidak ditemukan di assets: ${e.message}"
+                log(errMsg, PkgLogLevel.ERROR)
+                return@withContext Result.failure(Exception(errMsg))
             }
-            val patchedPayload = patchPayload(rawPayload, localIp, localPort)
 
-            // 3. Connect to GoldHEN BinLoader on Port 9090
+            val patchedPayload = try {
+                patchPayload(rawPayload, effectiveLocalIp, localPort)
+            } catch (e: Exception) {
+                val errMsg = "Gagal mem-patch binary payload: ${e.message}"
+                log(errMsg, PkgLogLevel.ERROR, e.stackTraceToString())
+                return@withContext Result.failure(Exception(errMsg))
+            }
+            log("Payload binary 16KB berhasil di-patch dengan callback: $effectiveLocalIp:$localPort", PkgLogLevel.SUCCESS)
+
+            // 4. Connect to GoldHEN BinLoader on Port 9090
             val ps4PayloadSocket = Socket()
             ps4PayloadSocket.tcpNoDelay = true
             try {
-                log("Menyambungkan ke PS4 $ps4Ip:$GOLDHEN_PORT...")
-                ps4PayloadSocket.connect(InetSocketAddress(ps4Ip, GOLDHEN_PORT), 3500)
+                log("Menyambungkan socket ke PS4 $ps4Ip:$GOLDHEN_PORT (Timeout: 5 detik)...", PkgLogLevel.INFO)
+                ps4PayloadSocket.connect(InetSocketAddress(ps4Ip, GOLDHEN_PORT), 5000)
                 val ps4Out = ps4PayloadSocket.getOutputStream()
                 ps4Out.write(patchedPayload)
                 ps4Out.flush()
-                log("Payload 16KB berhasil diinjeksikan ke GoldHEN Port $GOLDHEN_PORT pada $ps4Ip")
+                log("Payload 16KB berhasil diinjeksikan ke GoldHEN Port $GOLDHEN_PORT pada $ps4Ip", PkgLogLevel.SUCCESS)
             } catch (e: Exception) {
-                return@withContext Result.failure(
-                    Exception("Gagal terhubung ke GoldHEN Port $GOLDHEN_PORT di $ps4Ip: ${e.message}. Pastikan GoldHEN aktif dan 'Enable BinLoader Server' sudah dicentang pada menu GoldHEN PS4.")
-                )
+                val hint = when (e) {
+                    is java.net.ConnectException -> "Koneksi ditolak (Connection refused). BinLoader belum aktif di PS4! Buka menu GoldHEN di PS4 dan centang 'Enable BinLoader Server'."
+                    is java.net.SocketTimeoutException -> "Koneksi timeout (5 detik). Pastikan alamat IP PS4 ($ps4Ip) sudah benar dan konsol sudah terhubung ke Hotspot HP."
+                    is java.net.NoRouteToHostException -> "Tidak dapat menjangkau IP PS4 ($ps4Ip). Pastikan PS4 terhubung ke Hotspot Wi-Fi HP ini."
+                    else -> "Gagal berkomunikasi dengan port $GOLDHEN_PORT di $ps4Ip: ${e.message}"
+                }
+                val errMsg = "Gagal terhubung ke GoldHEN Port $GOLDHEN_PORT di $ps4Ip: ${e.message}. $hint"
+                log(errMsg, PkgLogLevel.ERROR, e.stackTraceToString())
+                return@withContext Result.failure(Exception(errMsg))
             } finally {
                 try { ps4PayloadSocket.close() } catch (_: Exception) {}
             }
 
-            // 4. Send package information for each file in queue
+            // 5. Send package information for each file in queue
             serverSocket.soTimeout = 15000
             for (i in files.indices) {
                 val file = files[i]
@@ -213,46 +265,59 @@ object GoldHenPayloadService {
                     contentType = contentType
                 )
 
-                log("Menunggu koneksi balik dari PS4 untuk paket [${i + 1}/${files.size}]: $name...")
+                log("Menunggu koneksi balik dari PS4 untuk paket [${i + 1}/${files.size}]: $name (Maks. 15 detik)...", PkgLogLevel.INFO)
                 val pkgSocket = try {
                     serverSocket.accept()
                 } catch (e: Exception) {
-                    return@withContext Result.failure(
-                        Exception(if (i == 0) "PS4 tidak merespons dalam 15 detik. Pastikan PS4 dan HP berada di satu jaringan hotspot." else "Koneksi ke PS4 terputus sebelum paket ${i + 1} terdaftar.")
-                    )
+                    val errMsg = if (i == 0) {
+                        "PS4 tidak merespons koneksi balik dalam 15 detik. Pastikan PS4 dan HP berada di jaringan hotspot yang sama ($effectiveLocalIp)."
+                    } else {
+                        "Koneksi ke PS4 terputus sebelum paket ${i + 1} terdaftar."
+                    }
+                    log("TIMEOUT: $errMsg", PkgLogLevel.ERROR, e.stackTraceToString())
+                    return@withContext Result.failure(Exception(errMsg))
                 }
+
+                val clientHost = pkgSocket.inetAddress?.hostAddress ?: "Unknown"
+                log("PS4 terhubung balik dari IP $clientHost! Mengirim data paket $name...", PkgLogLevel.SUCCESS)
 
                 try {
                     pkgSocket.tcpNoDelay = true
                     val clientOut = pkgSocket.getOutputStream()
                     clientOut.write(pkgBuffer)
                     clientOut.flush()
-                    log("Terkirim ke PS4: $name ($url)")
+                    log("✓ Terkirim ke PS4: $name ($url)", PkgLogLevel.SUCCESS)
+                } catch (e: Exception) {
+                    val errMsg = "Gagal menulis buffer paket ke socket PS4: ${e.message}"
+                    log(errMsg, PkgLogLevel.ERROR, e.stackTraceToString())
+                    return@withContext Result.failure(Exception(errMsg))
                 } finally {
                     try { pkgSocket.close() } catch (_: Exception) {}
                 }
             }
 
-            // 5. Send clean exit signal (uint32 = 0)
+            // 6. Send clean exit signal (uint32 = 0)
             try {
                 serverSocket.soTimeout = 5000
-                log("Mengirim sinyal exit bersih ke PS4...")
+                log("Mengirim sinyal exit bersih ke PS4...", PkgLogLevel.INFO)
                 val exitSocket = serverSocket.accept()
                 try {
                     exitSocket.tcpNoDelay = true
                     val exitOut = exitSocket.getOutputStream()
                     exitOut.write(buildExitBuffer())
                     exitOut.flush()
-                    log("Sesi payload GoldHEN selesai dengan sukses.")
+                    log("✓ Sesi payload GoldHEN selesai dengan sukses! Paket aktif di menu Notifikasi PS4.", PkgLogLevel.SUCCESS)
                 } finally {
                     try { exitSocket.close() } catch (_: Exception) {}
                 }
             } catch (e: Exception) {
-                log("Sesi payload ditutup oleh PS4: ${e.message}")
+                log("Sesi payload ditutup oleh PS4 (normal): ${e.message}", PkgLogLevel.INFO)
             }
 
             Result.success("Berhasil dikirim ke PS4! Unduhan aktif di menu Notifikasi konsol.")
         } catch (e: Exception) {
+            val errMsg = "Terjadi kesalahan tidak terduga: ${e.message}"
+            log(errMsg, PkgLogLevel.ERROR, e.stackTraceToString())
             Result.failure(e)
         } finally {
             try { serverSocket.close() } catch (_: Exception) {}
