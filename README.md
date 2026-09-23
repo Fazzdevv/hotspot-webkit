@@ -3,120 +3,59 @@
 [![Latest Release](https://img.shields.io/badge/Release-v1.2-blue.svg)](https://github.com/Fazzdevv/hotspot-webkit/releases/tag/v1.2)
 [![Android Min SDK](https://img.shields.io/badge/Min%20SDK-26%2B%20%28Android%208.0%2B%29-brightgreen.svg)](https://developer.android.com)
 [![Target SDK](https://img.shields.io/badge/Target%20SDK-34%20%28Android%2014%29-blue.svg)](https://developer.android.com)
-[![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-purple.svg)](https://kotlinlang.org)
-[![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose%20Material%203-4285F4.svg)](https://developer.android.com/jetpack/compose)
-[![Non-Root](https://img.shields.io/badge/Permissions-Non--Root%20Compatible-orange.svg)]()
+[![Non-Root](https://img.shields.io/badge/Permissions-Non--Root%20Compatible-orange.svg)](https://developer.android.com)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**Hotspot WebKit PS4-PS5** adalah aplikasi Android mandiri (*autonomous edge server*) yang mengubah smartphone Android Anda menjadi **Localhost Exploit Host & PS4 PKG Sender** berkecepatan tinggi tanpa memerlukan akses **Root**.
-
-Aplikasi ini dirancang khusus untuk komunitas PlayStation (PS4 & PS5) dengan dua mode utama:
-1. **Offline Exploit Hosting**: Memuat payload/jailbreak lokal melalui menu **Panduan Pengguna (User's Guide)** atau **Browser Internet** langsung dari hotspot portabel Android.
-2. **PS4 PKG Sender (Port 9090 GoldHEN)**: Mengirim dan menginstal berkas game/update `.pkg` ke PS4 secara nirkabel melalui injeksi payload BinLoader Port 9090 atau hosting server lokal untuk melanjutkan unduhan yang dijeda.
+An Android application that turns your smartphone into an offline exploit host and remote package installer for PlayStation 4 and PlayStation 5 over Wi-Fi hotspot, without requiring root access.
 
 ---
 
-## 🚀 Fitur Utama di v1.2
+## Features
 
-### 1. PKG Sender Live Console Log & Diagnostik Real-Time
-- **Console Log Interaktif**: Terminal monitoring proses pengiriman payload GoldHEN 9090 dan aktivitas unduhan PS4 secara live di tab PKG Sender.
-- **Deteksi Cerdas Error Port 9090**: Diagnosa penyebab error otomatis (misal: BinLoader belum aktif, IP PS4 salah, atau timeout) dengan tingkat level berwarna (`[INFO]`, `[OK]`, `[WARN]`, `[ERR]`).
-- **Aksi Cepat Salin & Bersihkan**: Tombol Salin Log ke clipboard dan Bersihkan riwayat log.
-
-### 2. Peningkatan Performa Throughput & Buffer 512 KB
-- **TCP Socket Tuning**: Menonaktifkan algoritma Nagle (`tcpNoDelay = true`) dan memperbesar TCP Send Buffer menjadi **1 MB**.
-- **Buffer Streaming 512 KB**: Pengaliran file raksasa dengan throughput maksimal di jaringan Wi-Fi Hotspot 5GHz tanpa lag.
-- **Pembersihan URL Manifest**: Mencegah error `0x80433060` (`SCE_HTTP_ERROR_INVALID_URL`) pada background download manager PS4 (BGFT/PlayGo).
-
-### 3. Dual-Tab Navigation & Server Saling Eksklusif (Mutually Exclusive)
-- Layar dashboard dibagi menjadi dua tab terisolasi: **`[ 🌐 WebKit Exploit ]`** dan **`[ 🎮 PS4 PKG Sender ]`**.
-- **Server Safety Isolation**: Mengaktifkan server WebKit otomatis mematikan mode server PKG, dan sebaliknya. Keduanya berbagi port 8080 secara dinamis tanpa tabrakan port (`bind address in use`).
-
-### 4. PS4 PKG Installer & Sender (GoldHEN Port 9090)
-- **GoldHEN BinLoader Integration**: Injeksi payload 16 KB resmi via socket port 9090 dengan patching Little-Endian otomatis.
-- **PlayGo JSON Manifest Generator (`/json/{id}.json`)**: Menghasilkan manifest potongan paket yang kompatibel 100% dengan download manager PlayStation 4.
-- **Deterministic ID SHA-256 (`PkgIdentifier`)**: Identifikasi berkas PKG berbasis hash Sony package digest (`0xFE0`), Title ID, Content ID, dan ukuran byte.
-- **Smart 8-Layer Fallback Matching**: Mencegah HTTP 404 saat pause/resume unduhan di menu Notifikasi PS4.
-- **UI Minimalis & Modern**: Tombol aksi seimbang `[ ➢ Kirim ke PS4 ]` dan `[ ☁ Taruh di Server ]` (untuk melanjutkan unduhan atau mengatasi error `0x80990086`).
-
-### 5. Dynamic Web Ripper / Auto-Cache (Clone Web Exploit)
-- Kloning dan unduh website exploit online langsung dari URL (misal Karo Exploit, KME PS4) tanpa perlu membuat file `.zip` manual.
-- Seluruh aset HTML, CSS, JS, dan gambar diunduh paralel dan otomatis disajikan secara offline dari memori internal HP.
-
-### 6. Multilingual Support (Bilingual ID 🇮🇩 / EN 🇬🇧)
-- Pengalih bahasa instan di header aplikasi antara Bahasa Indonesia dan Bahasa Inggris dengan penyimpanan preferensi persisten.
-
-### 7. All-Domain Direct Serving Engine (Wildcard 200 OK)
-- Semua permintaan HTTP dari konsol (baik `manuals.playstation.net`, browser web, maupun domain publik) langsung disajikan dengan **`HTTP 200 OK`** tanpa redirect 302, mencegah error domain sandbox pada browser konsol.
-
-### 8. Proteksi Jaringan PlayStation
-- **Tes Koneksi PS4 & PS5 Sukses (`netcheck.playstation.net`)**: Tes koneksi internet saat konfigurasi Wi-Fi selalu sukses.
-- **Proteksi Update Sistem Otomatis (`update.playstation.net`)**: Memblokir pengecekan firmware update PlayStation secara aman agar konsol terhindar dari pembaruan firmware yang tidak diinginkan.
-
-### 9. Modern Jetpack Compose UI & Background Persistence
-- Antarmuka bertema gelap (*Cyber Dark Slate*) dengan monitor kecepatan transfer live (MB/s), counter byte terkirim, generator QR code, serta **Live Traffic Radar**.
-- Berjalan stabil di latar belakang (*Foreground Service*) dengan `PowerManager.PARTIAL_WAKE_LOCK` dan `WifiManager.WifiLock` sehingga server tetap aktif 24/7 meskipun layar HP dimatikan.
+- **Offline Exploit Host**: Host and serve jailbreak exploits directly to PS4 and PS5 via User's Guide or browser without an internet connection.
+- **PS4 PKG Sender**: Send and install game packages, updates, and DLC files (`.pkg`) wirelessly to PS4 from phone storage via GoldHEN BinLoader (Port 9090).
+- **Live Transfer Console**: Real-time activity log showing connection status, payload injection progress, and download activity.
+- **Web Ripper**: Clone and cache online exploit websites directly to your phone for offline use.
+- **Dual Server Modes**: Separate WebKit Exploit and PKG Sender modes with automatic server management.
+- **Bilingual Interface**: In-app language toggle between English and Indonesian.
+- **Background Service**: Persistent background service keeps the server active even when the screen is turned off.
 
 ---
 
-## 🛠 Panduan Penggunaan
+## How to Use
 
-### A. Menggunakan WebKit Exploit Server (Tab 1)
-1. Nyalakan **Hotspot Portabel** di pengaturan Android.
-2. Buka aplikasi **Hotspot WebKit PS4-PS5** di tab **`[ 🌐 WebKit Exploit ]`**.
-3. Import file `.zip` exploit Anda atau gunakan tab **Web Ripper** untuk mengkloning URL exploit online.
-4. Tekan **"Nyalakan Server WebKit"**.
-5. Pada konsol PS4/PS5:
-   - Hubungkan ke Wi-Fi Hotspot HP.
-   - Atur koneksi internet > mode **Khusus (Custom)** > Proxy: **Gunakan (Use)**.
-   - Masukkan IP HP (misal `192.168.43.1`) dan Port `8080`.
-   - Buka **Panduan Pengguna (User's Guide)** di Pengaturan konsol untuk memuat exploit!
+### WebKit Exploit Mode
+1. Turn on **Portable Hotspot** on your Android phone.
+2. Open the app on the **WebKit Exploit** tab and import your exploit files or use Web Ripper.
+3. Tap **Start WebKit Server**.
+4. On your PS4 or PS5:
+   - Connect to the phone's Wi-Fi hotspot.
+   - Set up internet connection with **Custom** settings and enable **Proxy Server**.
+   - Enter your phone's IP address and Port `8080`.
+   - Open **User's Guide** in console Settings to load the exploit.
 
-### B. Mengirim Berkas .PKG ke PS4 (Tab 2)
-1. Sambungkan PS4 ke Hotspot Wi-Fi HP ini.
-2. Pada PS4 yang sudah terpasang GoldHEN: buka menu **GoldHEN** > centang/aktifkan **"BinLoader Server"** (Port 9090).
-3. Buka tab **`[ 🎮 PS4 PKG Sender ]`** di aplikasi HP.
-4. Tekan **"Pilih Berkas .PKG"** untuk memilih berkas game/update dari penyimpanan HP.
-5. Masukkan **Alamat IP PS4** Anda pada kolom input (Port otomatis 9090).
-6. Tekan **"Kirim ke PS4"**:
-   - Aplikasi akan menginjeksi payload 16KB ke port 9090 GoldHEN dan mengirimkan metadata paket PlayGo.
-   - Notifikasi unduhan akan langsung muncul di pojok kiri atas layar PS4!
-7. *Jika muncul error `0x80990086`*: artinya paket sudah ada di antrean konsol. Tekan **"Taruh di Server"**, lalu buka menu Notifikasi di PS4 dan pilih **Lanjutkan (Resume)**.
+### PS4 PKG Sender Mode
+1. Connect your PS4 to the phone's Wi-Fi hotspot.
+2. On PS4, open GoldHEN settings and enable **BinLoader Server** (Port 9090).
+3. Switch to the **PS4 PKG Sender** tab in the app.
+4. Select one or more `.pkg` files from your device storage.
+5. Enter your PS4 IP address and tap **Send to PS4**.
+6. The download will start automatically in the PS4 Notifications menu.
 
 ---
 
-## 📦 Download APK Release
+## Download
 
-| Versi | Berkas APK | Keterangan |
+| Version | APK File | Description |
 | :--- | :--- | :--- |
-| **v1.2 (Terbaru)** | [**hotspot-webkit-ps4-ps5-v1.2.apk**](https://github.com/Fazzdevv/hotspot-webkit/releases/download/v1.2/hotspot-webkit-ps4-ps5-v1.2.apk) | PKG Live Console Log, Fix BGFT Error 0x80433060, 512KB Buffer + 1MB TCP Tuning |
-| **v1.1** | [hotspot-webkit-ps4-ps5-v1.1.apk](https://github.com/Fazzdevv/hotspot-webkit/releases/download/v1.1/hotspot-webkit-ps4-ps5-v1.1.apk) | Dual-Tab UI, PKG Sender GoldHEN Port 9090, Web Ripper, Mutually Exclusive Servers |
-| **v1.0** | [hotspot-webkit-ps4-ps5-v1.0.apk](https://github.com/Fazzdevv/hotspot-webkit/releases/download/v1.0/hotspot-webkit-ps4-ps5-v1.0.apk) | All-Domain Direct Serving Engine, Wildcard Proxy, Offline Exploit Portal |
+| **v1.2 (Latest)** | [**hotspot-webkit-ps4-ps5-v1.2.apk**](https://github.com/Fazzdevv/hotspot-webkit/releases/download/v1.2/hotspot-webkit-ps4-ps5-v1.2.apk) | Live Console Log, BGFT fix, optimized transfer buffer |
+| **v1.1** | [hotspot-webkit-ps4-ps5-v1.1.apk](https://github.com/Fazzdevv/hotspot-webkit/releases/download/v1.1/hotspot-webkit-ps4-ps5-v1.1.apk) | Dual-tab interface, PKG Sender Port 9090, Web Ripper |
+| **v1.0** | [hotspot-webkit-ps4-ps5-v1.0.apk](https://github.com/Fazzdevv/hotspot-webkit/releases/download/v1.0/hotspot-webkit-ps4-ps5-v1.0.apk) | Offline Exploit Portal, wildcard proxy |
 
-Berkas APK lokal juga tersedia langsung di repositori pada folder [`release/hotspot-webkit-ps4-ps5-v1.2.apk`](release/hotspot-webkit-ps4-ps5-v1.2.apk) dan [`release/hotspot-webkit-ps4-ps5.apk`](release/hotspot-webkit-ps4-ps5.apk).
-
----
-
-## 🏗 Cara Build dari Source Code
-
-### Prasyarat:
-- Java JDK 17
-- Android SDK 34 (Build-Tools 34.0.0)
-
-### Langkah Kompilasi:
-```bash
-# Clone repository
-git clone https://github.com/Fazzdevv/hotspot-webkit.git
-cd hotspot-webkit
-
-# Build APK Debug
-./gradlew assembleDebug
-```
-Berkas APK hasil build akan berada di `app/build/outputs/apk/debug/app-debug.apk` atau `release/hotspot-webkit-ps4-ps5-v1.1.apk`.
+Local APK files are also available in the repository under [`release/hotspot-webkit-ps4-ps5-v1.2.apk`](release/hotspot-webkit-ps4-ps5-v1.2.apk) and [`release/hotspot-webkit-ps4-ps5.apk`](release/hotspot-webkit-ps4-ps5.apk).
 
 ---
 
-## 📄 Lisensi
+## License
 
-Proyek ini dirilis di bawah lisensi [MIT License](LICENSE). Bebas digunakan, dimodifikasi, dan didistribusikan untuk keperluan personal maupun komersial.
-
+This project is licensed under the [MIT License](LICENSE).
