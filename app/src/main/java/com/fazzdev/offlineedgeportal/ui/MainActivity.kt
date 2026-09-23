@@ -28,6 +28,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // SAF Document Picker for .pkg files
+    private val pickPkgLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val fileName = queryFileName(uri) ?: "game.pkg"
+            viewModel.addPkgFile(this, uri, fileName)
+        }
+    }
+
     // Permission request launcher for notifications on Android 13+
     private val requestNotificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -39,7 +49,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         checkNotificationPermission()
-        viewModel.loadInitialSiteInfo(this)
+        viewModel.loadInitialSettings(this)
 
         setContent {
             OfflineEdgePortalTheme {
@@ -50,6 +60,14 @@ class MainActivity : ComponentActivity() {
                             arrayOf(
                                 "application/zip",
                                 "application/x-zip-compressed",
+                                "application/octet-stream",
+                                "*/*"
+                            )
+                        )
+                    },
+                    onPickPkgClick = {
+                        pickPkgLauncher.launch(
+                            arrayOf(
                                 "application/octet-stream",
                                 "*/*"
                             )

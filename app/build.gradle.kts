@@ -11,8 +11,8 @@ android {
         applicationId = "com.fazzdev.offlineedgeportal"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
 
         vectorDrawables {
             useSupportLibrary = true
@@ -75,6 +75,13 @@ dependencies {
 
     // QR Code Generator
     implementation("com.google.zxing:core:3.5.3")
+
+    // HTTP & Web Ripper
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("org.jsoup:jsoup:1.17.2")
+
+    // JSON Serialization for PlayGo Manifest
+    implementation("com.google.code.gson:gson:2.10.1")
 
     testImplementation("junit:junit:4.13.2")
     debugImplementation("androidx.compose.ui:ui-tooling")

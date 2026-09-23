@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Hotspot WebKit PS4-PS5</string>
-    <string name="server_running">Edge Server PS4-PS5 Aktif</string>
-    <string name="server_stopped">Edge Server PS4-PS5 Berhenti</string>
-    <string name="channel_name">Layanan Server PS4-PS5</string>
-    <string name="channel_desc">Menjaga server web lokal dan proxy tetap berjalan</string>
+    <string name="server_running">Edge Server PS4-PS5 Active</string>
+    <string name="server_stopped">Edge Server PS4-PS5 Stopped</string>
+    <string name="channel_name">PS4-PS5 Server Service</string>
+    <string name="channel_desc">Keeps the local edge server and proxy active in the background</string>
 </resources>

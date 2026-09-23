@@ -1,6 +1,10 @@
 package com.fazzdev.offlineedgeportal.core
 
+import android.content.Context
 import android.webkit.MimeTypeMap
+import com.fazzdev.offlineedgeportal.pkg.model.PkgFile
+import com.fazzdev.offlineedgeportal.pkg.server.ContentRangeStreamer
+import com.fazzdev.offlineedgeportal.pkg.server.PkgRegistry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -16,6 +20,7 @@ import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.URLDecoder
+import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -32,9 +37,11 @@ data class RequestLog(
 )
 
 class LocalEdgeServer(
+    private val context: Context,
     private val port: Int = 8080,
     private val siteRootDir: () -> File,
     private val currentNativeIp: () -> String,
+    private val currentMode: () -> ServerActiveMode = { ServerActiveMode.WEBKIT },
     private val onLog: (RequestLog) -> Unit
 ) {
     private var serverSocket: ServerSocket? = null
@@ -255,9 +262,100 @@ class LocalEdgeServer(
         }
         cleanPath = cleanPath.substringBefore("?")
 
+        val mode = currentMode()
+
         // PAC / WPAD Script Endpoint
         if (cleanPath == "/wpad.dat" || cleanPath == "/proxy.pac") {
             servePacFile(output, nativeIp)
+            onLog(
+                RequestLog(
+                    timestamp = System.currentTimeMillis(),
+                    clientIp = clientIp,
+                    method = method,
+                    host = nativeIp,
+                    uri = cleanPath,
+                    isRedirected = false,
+                    statusCode = 200
+                )
+            )
+            return
+        }
+
+        // PlayGo JSON Manifest Endpoint: /json/{fileId}.json or /json/{fileId}
+        if (cleanPath.startsWith("/json/")) {
+            if (mode != ServerActiveMode.PKG_SENDER) {
+                serveCustomHtml(output, 404, "PKG Mode Inactive", "Server is currently running in WebKit Exploit mode. Please switch to PS4 PKG Sender tab to enable PKG streaming.")
+                return
+            }
+            val rawId = cleanPath.removePrefix("/json/").substringBefore("/").substringBefore("?")
+            val fileId = if (rawId.endsWith(".json", ignoreCase = true)) rawId.removeSuffix(".json") else rawId
+            val file = PkgRegistry.getFile(fileId)
+            if (file != null) {
+                servePlayGoManifest(file, nativeIp, output)
+                onLog(
+                    RequestLog(
+                        timestamp = System.currentTimeMillis(),
+                        clientIp = clientIp,
+                        method = method,
+                        host = nativeIp,
+                        uri = cleanPath,
+                        isRedirected = false,
+                        statusCode = 200
+                    )
+                )
+                return
+            }
+        }
+
+        // Direct PKG Streaming Endpoint: /pkg/{fileId}/{filename} or /pkg/{fileId}
+        if (cleanPath.startsWith("/pkg/")) {
+            if (mode != ServerActiveMode.PKG_SENDER) {
+                serveCustomHtml(output, 404, "PKG Mode Inactive", "Server is currently running in WebKit Exploit mode. Please switch to PS4 PKG Sender tab to enable PKG streaming.")
+                return
+            }
+            val pathWithoutPrefix = cleanPath.removePrefix("/pkg/")
+            val fileId = pathWithoutPrefix.substringBefore("/").substringBefore("?")
+            val requestedFilename = if (pathWithoutPrefix.contains("/")) pathWithoutPrefix.substringAfter("/").substringBefore("?") else null
+            val file = PkgRegistry.getFile(fileId, requestedFilename)
+            if (file != null) {
+                ContentRangeStreamer.streamUri(
+                    contentResolver = context.contentResolver,
+                    uri = file.uri,
+                    totalLength = file.sizeBytes,
+                    rangeHeader = rangeHeader,
+                    outputStream = output,
+                    isHeadRequest = method == "HEAD",
+                    onProgress = { delta, currentOffset ->
+                        PkgRegistry.totalBytesServed.addAndGet(delta)
+                        PkgRegistry.sessionBytesServed.addAndGet(delta)
+                        PkgRegistry.fileBytesServed.compute(file.id) { _, cur ->
+                            val c = cur?.get() ?: 0L
+                            java.util.concurrent.atomic.AtomicLong(c + delta)
+                        }
+                        PkgRegistry.updateOffsetProgress(file.id, currentOffset)
+                        if (currentOffset >= file.sizeBytes && file.sizeBytes > 0) {
+                            PkgRegistry.markFileCompleted(file.id)
+                        }
+                    }
+                )
+                onLog(
+                    RequestLog(
+                        timestamp = System.currentTimeMillis(),
+                        clientIp = clientIp,
+                        method = method,
+                        host = nativeIp,
+                        uri = cleanPath,
+                        isRedirected = false,
+                        statusCode = if (rangeHeader != null) 206 else 200
+                    )
+                )
+                return
+            }
+        }
+
+        // If running in PKG_SENDER mode, serve dedicated PKG Server status page for browser / web requests
+        if (mode == ServerActiveMode.PKG_SENDER) {
+            servePkgServerStatusPage(output, nativeIp)
             onLog(
                 RequestLog(
                     timestamp = System.currentTimeMillis(),
@@ -516,6 +614,24 @@ class LocalEdgeServer(
         output.flush()
     }
 
+    private fun servePlayGoManifest(file: PkgFile, nativeIp: String, output: BufferedOutputStream) {
+        val filename = if (file.name.endsWith(".pkg", ignoreCase = true)) file.name else "${file.name}.pkg"
+        val encodedName = URLDecoder.decode(filename, "UTF-8").let { URLEncoder.encode(it, "UTF-8").replace("+", "%20") }
+        val pieceUrl = "http://$nativeIp:$port/pkg/${file.id}/$encodedName"
+        val digest = file.packageDigest ?: "0000000000000000000000000000000000000000000000000000000000000000"
+        val manifestJson = "{\"originalFileSize\":${file.sizeBytes},\"packageDigest\":\"$digest\",\"numberOfSplitFiles\":1,\"pieces\":[{\"fileOffset\":0,\"fileSize\":${file.sizeBytes},\"url\":\"$pieceUrl\",\"hashValue\":\"0000000000000000000000000000000000000000\"}]}"
+        val jsonBytes = manifestJson.toByteArray(Charsets.UTF_8)
+        val header = (
+            "HTTP/1.1 200 OK\r\n" +
+            "Content-Type: application/json; charset=utf-8\r\n" +
+            "Content-Length: ${jsonBytes.size}\r\n" +
+            "Connection: close\r\n\r\n"
+        ).toByteArray(Charsets.US_ASCII)
+        output.write(header)
+        output.write(jsonBytes)
+        output.flush()
+    }
+
     private fun serveStaticFile(file: File, rangeHeader: String?, output: BufferedOutputStream) {
         val totalLength = file.length()
         val mime = getMimeType(file.extension)
@@ -634,5 +750,53 @@ class LocalEdgeServer(
             "zip" -> "application/zip"
             else -> MimeTypeMap.getSingleton().getMimeTypeFromExtension(lower) ?: "application/octet-stream"
         }
+    }
+
+    private fun servePkgServerStatusPage(output: BufferedOutputStream, nativeIp: String) {
+        val html = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+                <title>PS4 PKG Server</title>
+                <style>
+                    body { background: #0a0e17; color: #e6edf3; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+                    .card { background: #161f30; border: 1px solid #1f6feb; border-radius: 16px; padding: 32px; max-width: 480px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+                    h1 { color: #00d2ff; font-size: 22px; margin-bottom: 8px; }
+                    p { color: #8a9ba8; font-size: 14px; line-height: 1.5; }
+                    .badge { display: inline-block; background: rgba(0,255,136,0.15); color: #00ff88; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; margin-bottom: 16px; }
+                </style>
+            </head>
+            <body>
+                <div class="card">
+                    <div class="badge">SERVER ACTIVE ($nativeIp:8080)</div>
+                    <h1>PS4 PKG Sender Server</h1>
+                    <p>Server is ready to stream .pkg files to your PlayStation 4 console via GoldHEN Port 9090.</p>
+                </div>
+            </body>
+            </html>
+        """.trimIndent()
+        val bytes = html.toByteArray(Charsets.UTF_8)
+        val header = "HTTP/1.1 200 OK\r\n" +
+                "Content-Type: text/html; charset=utf-8\r\n" +
+                "Content-Length: ${bytes.size}\r\n" +
+                "Connection: close\r\n\r\n"
+        output.write(header.toByteArray(Charsets.ISO_8859_1))
+        output.write(bytes)
+        output.flush()
+    }
+
+    private fun serveCustomHtml(output: BufferedOutputStream, statusCode: Int, statusText: String, message: String) {
+        val html = """
+            <!DOCTYPE html><html><body style="background:#0a0e17;color:#fff;font-family:sans-serif;padding:30px;text-align:center;">
+            <h2>$statusText</h2><p style="color:#8a9ba8;">$message</p>
+            </body></html>
+        """.trimIndent()
+        val bytes = html.toByteArray(Charsets.UTF_8)
+        val header = "HTTP/1.1 $statusCode $statusText\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n"
+        output.write(header.toByteArray(Charsets.ISO_8859_1))
+        output.write(bytes)
+        output.flush()
     }
 }

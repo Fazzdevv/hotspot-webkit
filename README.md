@@ -15,14 +15,18 @@ Aplikasi ini dirancang khusus untuk skenario **Offline Exploit Hosting PS4 & PS5
 
 ## Fitur Utama
 
-- **All-Domain Direct Serving Engine (Wildcard 200 OK)**: Semua permintaan HTTP dari konsol (baik `manuals.playstation.net`, browser web, maupun URL lainnya) langsung disajikan dengan **`HTTP 200 OK`** dari file lokal `.zip` tanpa redirect 302, mencegah error sandbox domain dan loop redirect.
-- **Dukungan Penuh PS4 & PS5 User's Guide**: Memetakan path bahasa (`/document/{lang}/ps4/...` dan `/document/{lang}/ps5/...`) secara cerdas ke root berkas `.zip` kamu.
+- **Dynamic Web Ripper / Auto-Cache**: Kloning dan unduh website exploit online langsung dari URL tanpa perlu membuat file `.zip` manual. Aset HTML, CSS, JS, dan gambar diunduh secara paralel dan otomatis disajikan secara offline.
+- **PS4 PKG Installer & Sender (Port 9090 GoldHEN)**: Terinspirasi langsung dari `PS4PkgSender.exe` v1.2.0 Desktop yang matang. Mendukung pengiriman fPKG ke PS4 via GoldHEN BinLoader (Port 9090), PlayGo JSON Manifest generator (`/json/{id}.json`), Deterministic ID SHA-256 (`PkgIdentifier`), Smart Fallback Matching anti-404 saat pause/resume unduhan, dan buffer streaming 256 KB (`206 Partial Content`).
+- **Mode Host on Server (Resume Unduhan)**: Menyajikan berkas PKG langsung di server port 8080 untuk menangani error `0x80990086` atau melanjutkan unduhan yang sedang dijeda di menu Notifikasi PS4.
+- **Multilingual Support (Bilingual ID 🇮🇩 / EN 🇬🇧)**: Pengalih bahasa instan di bagian header aplikasi yang tersimpan secara persisten tanpa perlu mengubah bahasa sistem perangkat Android.
+- **All-Domain Direct Serving Engine (Wildcard 200 OK)**: Semua permintaan HTTP dari konsol (baik `manuals.playstation.net`, browser web, maupun URL lainnya) langsung disajikan dengan **`HTTP 200 OK`** dari file lokal `.zip` atau hasil web ripper tanpa redirect 302, mencegah error sandbox domain dan loop redirect.
+- **Dukungan Penuh PS4 & PS5 User's Guide**: Memetakan path bahasa (`/document/{lang}/ps4/...` dan `/document/{lang}/ps5/...`) secara cerdas ke root berkas lokal Anda.
 - **Tes Koneksi PS4 & PS5 Sukses (`netcheck.playstation.net`)**: Merespons request netcheck PlayStation dengan `200 OK` sehingga tes koneksi internet saat setup jaringan di konsol selalu berstatus **Sukses**.
 - **Proteksi Update Sistem Otomatis (`update.playstation.net`)**: Memblokir pengecekan firmware update PlayStation secara aman agar konsol terhindar dari pembaruan sistem yang tidak diinginkan.
-- **Dynamic ZIP Package Host**: Dapat menjalankan website atau paket exploit apa pun (HTML, CSS, JS, bin payload) cukup dengan mengimpor file `.zip` dari penyimpanan internal HP menggunakan *Android Storage Access Framework (SAF)*. Dilengkapi proteksi keamanan terhadap *Zip-Slip Vulnerability*.
+- **Dynamic ZIP Package Host**: Dapat menjalankan website atau paket exploit apa pun cukup dengan mengimpor file `.zip` dari penyimpanan internal HP menggunakan *Android Storage Access Framework (SAF)* dengan proteksi terhadap *Zip-Slip Vulnerability*.
 - **Deteksi IP Native Hardware**: Secara otomatis mengiterasi interface jaringan hardware Android (`ap0`, `wlan1`, `swlan0`, `softap`) untuk mendeteksi alamat IPv4 tethering yang sebenarnya secara akurat.
-- **HTTP 206 Partial Content (Media Streaming)**: Mendukung pemutaran audio dan video dengan fitur *seeking* / *scrubbing* yang mulus.
-- **Modern Jetpack Compose UI**: Antarmuka bertema gelap (*Cyber Dark Slate*) dengan indikator status beranimasi pulsasi, generator **QR Code instan**, tombol satu ketukan untuk salin IP/URL, serta **Live Traffic Radar** untuk memantau request konsol secara real-time.
+- **HTTP 206 Partial Content (High-Throughput Streaming)**: Mendukung pemutaran media dan pengaliran file PKG puluhan GB dengan buffer 256 KB dan penanganan range byte (RFC 7233).
+- **Modern Jetpack Compose UI**: Antarmuka bertema gelap (*Cyber Dark Slate*) dengan indikator status beranimasi pulsasi, generator **QR Code instan**, tombol satu ketukan untuk salin IP/URL, tabs sumber website, monitoring transfer kecepatan tinggi, serta **Live Traffic Radar**.
 - **Background Persistence (Foreground Service & WakeLock)**: Dilengkapi Android Foreground Service dengan `PowerManager.PARTIAL_WAKE_LOCK` dan `WifiManager.WifiLock` agar server tetap aktif melayani konsol 24/7 meskipun layar HP dimatikan.
 
 ---

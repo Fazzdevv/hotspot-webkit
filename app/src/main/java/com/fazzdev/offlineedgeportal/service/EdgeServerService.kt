@@ -16,6 +16,7 @@ import com.fazzdev.offlineedgeportal.R
 import com.fazzdev.offlineedgeportal.core.LocalEdgeServer
 import com.fazzdev.offlineedgeportal.core.NetworkUtils
 import com.fazzdev.offlineedgeportal.core.RequestLog
+import com.fazzdev.offlineedgeportal.core.ServerActiveMode
 import com.fazzdev.offlineedgeportal.core.SitePackageInfo
 import com.fazzdev.offlineedgeportal.core.ZipPackageManager
 import com.fazzdev.offlineedgeportal.ui.MainActivity
@@ -29,6 +30,7 @@ import kotlinx.coroutines.launch
 
 data class ServerRuntimeState(
     val isRunning: Boolean = false,
+    val activeMode: ServerActiveMode = ServerActiveMode.OFF,
     val nativeIp: String = "127.0.0.1",
     val port: Int = 8080,
     val interfaceName: String = "-",
@@ -46,6 +48,8 @@ class EdgeServerService : Service() {
     private val scope = CoroutineScope(Dispatchers.Main)
 
     companion object {
+        const val ACTION_START_WEBKIT = "com.fazzdev.offlineedgeportal.START_WEBKIT"
+        const val ACTION_START_PKG = "com.fazzdev.offlineedgeportal.START_PKG"
         const val ACTION_START = "com.fazzdev.offlineedgeportal.START"
         const val ACTION_STOP = "com.fazzdev.offlineedgeportal.STOP"
         private const val CHANNEL_ID = "edge_server_channel"
@@ -57,15 +61,30 @@ class EdgeServerService : Service() {
         private val _logEvents = MutableSharedFlow<RequestLog>(replay = 50)
         val logEvents = _logEvents.asSharedFlow()
 
-        fun startService(context: Context) {
+        fun startWebKitService(context: Context) {
             val intent = Intent(context, EdgeServerService::class.java).apply {
-                action = ACTION_START
+                action = ACTION_START_WEBKIT
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent)
             } else {
                 context.startService(intent)
             }
+        }
+
+        fun startPkgService(context: Context) {
+            val intent = Intent(context, EdgeServerService::class.java).apply {
+                action = ACTION_START_PKG
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+        }
+
+        fun startService(context: Context) {
+            startWebKitService(context)
         }
 
         fun stopService(context: Context) {
@@ -85,14 +104,30 @@ class EdgeServerService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_START -> startEdgeServer()
+            ACTION_START, ACTION_START_WEBKIT -> switchModeOrStart(ServerActiveMode.WEBKIT)
+            ACTION_START_PKG -> switchModeOrStart(ServerActiveMode.PKG_SENDER)
             ACTION_STOP -> stopEdgeServer()
         }
         return START_NOT_STICKY
     }
 
-    private fun startEdgeServer() {
-        if (_serverState.value.isRunning) return
+    private fun switchModeOrStart(mode: ServerActiveMode) {
+        val current = _serverState.value
+        if (!current.isRunning || localServer == null) {
+            startEdgeServer(mode)
+        } else {
+            // Mode switch on the fly
+            _serverState.value = current.copy(activeMode = mode)
+            updateNotification(mode, current.nativeIp, current.port)
+        }
+    }
+
+    private fun startEdgeServer(initialMode: ServerActiveMode) {
+        if (_serverState.value.isRunning && localServer != null) {
+            _serverState.value = _serverState.value.copy(activeMode = initialMode)
+            updateNotification(initialMode, _serverState.value.nativeIp, _serverState.value.port)
+            return
+        }
 
         // 1. Acquire WakeLock and WifiLock
         acquireLocks()
@@ -108,9 +143,11 @@ class EdgeServerService : Service() {
 
         // 4. Start Local Edge Server on port 8080
         localServer = LocalEdgeServer(
+            context = applicationContext,
             port = 8080,
             siteRootDir = { ZipPackageManager.inspectPackage(siteDir).documentRootDir },
             currentNativeIp = { _serverState.value.nativeIp },
+            currentMode = { _serverState.value.activeMode },
             onLog = { log ->
                 scope.launch {
                     val current = _serverState.value
@@ -128,6 +165,7 @@ class EdgeServerService : Service() {
 
             _serverState.value = ServerRuntimeState(
                 isRunning = true,
+                activeMode = initialMode,
                 nativeIp = detectedIp,
                 port = 8080,
                 interfaceName = detectedInterfaceName,
@@ -136,7 +174,7 @@ class EdgeServerService : Service() {
             )
 
             // Start Foreground Notification
-            val notification = buildNotification("IP: $detectedIp:8080 (Aktif)")
+            val notification = buildNotification(initialMode, detectedIp, 8080)
             startForeground(NOTIFICATION_ID, notification)
         } catch (e: Exception) {
             e.printStackTrace()
@@ -154,7 +192,8 @@ class EdgeServerService : Service() {
         releaseLocks()
 
         _serverState.value = _serverState.value.copy(
-            isRunning = false
+            isRunning = false,
+            activeMode = ServerActiveMode.OFF
         )
 
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -218,7 +257,13 @@ class EdgeServerService : Service() {
         }
     }
 
-    private fun buildNotification(statusText: String): Notification {
+    private fun updateNotification(mode: ServerActiveMode, ip: String, port: Int) {
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val notification = buildNotification(mode, ip, port)
+        notificationManager.notify(NOTIFICATION_ID, notification)
+    }
+
+    private fun buildNotification(mode: ServerActiveMode, ip: String, port: Int): Notification {
         val launchIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
@@ -235,9 +280,15 @@ class EdgeServerService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val modeTitle = when (mode) {
+            ServerActiveMode.WEBKIT -> "WebKit Exploit Server"
+            ServerActiveMode.PKG_SENDER -> "PS4 PKG Sender Server"
+            ServerActiveMode.OFF -> "Hotspot Edge Server"
+        }
+
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Hotspot WebKit PS4-PS5")
-            .setContentText(statusText)
+            .setContentTitle(modeTitle)
+            .setContentText("IP: $ip:$port (Aktif)")
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
