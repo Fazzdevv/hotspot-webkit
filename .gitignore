@@ -13,3 +13,6 @@ app/build/
 !release/*.apk
 .env
 *.env
+sample/
+*.pkg
+

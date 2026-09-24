@@ -26,7 +26,7 @@ object PkgHeaderParser {
     fun extractFromUri(context: Context, uri: Uri, fallbackName: String): PkgHeaderInfo? {
         return try {
             context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                val buffer = ByteArray(16384)
+                val buffer = ByteArray(65536)
                 var totalRead = 0
                 while (totalRead < buffer.size) {
                     val read = inputStream.read(buffer, totalRead, buffer.size - totalRead)
@@ -78,7 +78,7 @@ object PkgHeaderParser {
             "0000000000000000000000000000000000000000000000000000000000000000"
         }
 
-        // 5. Category detection
+        // 5. Category detection from PARAM.SFO entry in PKG entry table
         var detectedCategory: String? = null
         try {
             if (bytes.size >= 0x20) {
@@ -99,7 +99,7 @@ object PkgHeaderParser {
                                 ((bytes[entryPos + 1].toInt() and 0xFF) shl 16) or
                                 ((bytes[entryPos + 2].toInt() and 0xFF) shl 8) or
                                 (bytes[entryPos + 3].toInt() and 0xFF)
-                        if (entryId == 0x00001000) { // PARAM_SFO
+                        if (entryId == 0x00001000) { // PARAM_SFO entry
                             val dataOffset = ((bytes[entryPos + 16].toInt() and 0xFF) shl 24) or
                                     ((bytes[entryPos + 17].toInt() and 0xFF) shl 16) or
                                     ((bytes[entryPos + 18].toInt() and 0xFF) shl 8) or
@@ -120,13 +120,15 @@ object PkgHeaderParser {
             }
         } catch (_: Exception) {}
 
-        val finalCategory = detectedCategory ?: if (fallbackSourceName.contains(Regex("""(?i)_00-A|-A\d{4}|patch|update""")) ||
-            rawContentId.contains(Regex("""(?i)_00-A|-A\d{4}"""))
-        ) "PS4GP"
-        else if (fallbackSourceName.contains(Regex("""(?i)_00-C|dlc|additional""")) ||
-            rawContentId.contains(Regex("""(?i)_00-C"""))
-        ) "PS4AC"
-        else "PS4GD"
+        // Safe Fallback Category Determination:
+        // Do NOT guess based on arbitrary ContentID substrings like _00-A or _00-C, which misclassified
+        // standard base games (e.g. Assassin's Creed, Cyberpunk) as patches or DLCs and caused BGFT Error 0x80990006!
+        val finalCategory = detectedCategory ?: when {
+            fallbackSourceName.contains(Regex("""(?i)[._ -](patch|update)[._ -]""")) ||
+            fallbackSourceName.contains(Regex("""(?i)-A\d{4}""")) -> "PS4GP"
+            fallbackSourceName.contains(Regex("""(?i)[._ -]dlc[._ -]""")) -> "PS4AC"
+            else -> "PS4GD"
+        }
 
         return PkgHeaderInfo(
             contentId = rawContentId,
@@ -136,15 +138,72 @@ object PkgHeaderParser {
         )
     }
 
-    private fun parseCategoryFromSfo(sfoBytes: ByteArray): String? {
-        val sfoStr = String(sfoBytes, Charsets.ISO_8859_1)
-        val idx = sfoStr.indexOf("CATEGORY")
-        if (idx != -1 && idx + 12 < sfoBytes.size) {
-            for (i in (idx + 8)..(idx + 32).coerceAtMost(sfoBytes.size - 3)) {
-                val candidate = String(sfoBytes, i, 2, Charsets.US_ASCII)
-                if (candidate.equals("gd", ignoreCase = true)) return "PS4GD"
-                if (candidate.equals("gp", ignoreCase = true)) return "PS4GP"
-                if (candidate.equals("ac", ignoreCase = true)) return "PS4AC"
+    /**
+     * Accurately parses CATEGORY from Sony PARAM.SFO binary table structure:
+     * Header (20 bytes): \0PSF, key_table_offset (LE uint32), data_table_offset (LE uint32), num_entries (LE uint32)
+     * Index Table (16 bytes per entry): key_offset, data_fmt, data_len, data_max, data_offset
+     */
+    fun parseCategoryFromSfo(sfoBytes: ByteArray): String? {
+        if (sfoBytes.size < 20) return null
+        // Header verification: 0x00: \0PSF
+        if (sfoBytes[0] != 0.toByte() || sfoBytes[1] != 'P'.code.toByte() ||
+            sfoBytes[2] != 'S'.code.toByte() || sfoBytes[3] != 'F'.code.toByte()
+        ) {
+            return null
+        }
+        val keyTableOffset = ((sfoBytes[0x08].toInt() and 0xFF)) or
+                ((sfoBytes[0x09].toInt() and 0xFF) shl 8) or
+                ((sfoBytes[0x0A].toInt() and 0xFF) shl 16) or
+                ((sfoBytes[0x0B].toInt() and 0xFF) shl 24)
+        val dataTableOffset = ((sfoBytes[0x0C].toInt() and 0xFF)) or
+                ((sfoBytes[0x0D].toInt() and 0xFF) shl 8) or
+                ((sfoBytes[0x0E].toInt() and 0xFF) shl 16) or
+                ((sfoBytes[0x0F].toInt() and 0xFF) shl 24)
+        val numEntries = ((sfoBytes[0x10].toInt() and 0xFF)) or
+                ((sfoBytes[0x11].toInt() and 0xFF) shl 8) or
+                ((sfoBytes[0x12].toInt() and 0xFF) shl 16) or
+                ((sfoBytes[0x13].toInt() and 0xFF) shl 24)
+
+        if (numEntries <= 0 || numEntries > 500) return null
+
+        var entryOffset = 0x14
+        for (i in 0 until numEntries) {
+            if (entryOffset + 16 > sfoBytes.size) break
+            val keyOff = ((sfoBytes[entryOffset].toInt() and 0xFF)) or
+                    ((sfoBytes[entryOffset + 1].toInt() and 0xFF) shl 8)
+            val dataLen = ((sfoBytes[entryOffset + 4].toInt() and 0xFF)) or
+                    ((sfoBytes[entryOffset + 5].toInt() and 0xFF) shl 8) or
+                    ((sfoBytes[entryOffset + 6].toInt() and 0xFF) shl 16) or
+                    ((sfoBytes[entryOffset + 7].toInt() and 0xFF) shl 24)
+            val dataOff = ((sfoBytes[entryOffset + 12].toInt() and 0xFF)) or
+                    ((sfoBytes[entryOffset + 13].toInt() and 0xFF) shl 8) or
+                    ((sfoBytes[entryOffset + 14].toInt() and 0xFF) shl 16) or
+                    ((sfoBytes[entryOffset + 15].toInt() and 0xFF) shl 24)
+
+            entryOffset += 16
+
+            val absKeyOff = keyTableOffset + keyOff
+            if (absKeyOff >= sfoBytes.size) continue
+
+            var keyEnd = absKeyOff
+            while (keyEnd < sfoBytes.size && sfoBytes[keyEnd] != 0.toByte()) {
+                keyEnd++
+            }
+            val key = String(sfoBytes, absKeyOff, keyEnd - absKeyOff, Charsets.US_ASCII)
+
+            if (key == "CATEGORY") {
+                val absDataOff = dataTableOffset + dataOff
+                if (absDataOff + dataLen <= sfoBytes.size && dataLen > 0) {
+                    val rawVal = String(sfoBytes, absDataOff, dataLen, Charsets.US_ASCII)
+                        .trim { it <= ' ' || it == '\u0000' }
+                        .lowercase()
+                    return when {
+                        rawVal.startsWith("gd") -> "PS4GD"
+                        rawVal.startsWith("gp") -> "PS4GP"
+                        rawVal.startsWith("ac") -> "PS4AC"
+                        else -> "PS4GD"
+                    }
+                }
             }
         }
         return null

@@ -14,10 +14,12 @@ import com.fazzdev.offlineedgeportal.core.ZipPackageManager
 import com.fazzdev.offlineedgeportal.pkg.model.PkgFile
 import com.fazzdev.offlineedgeportal.pkg.model.PkgLogEntry
 import com.fazzdev.offlineedgeportal.pkg.model.PkgLogLevel
+import com.fazzdev.offlineedgeportal.pkg.network.GoldHenFtpService
 import com.fazzdev.offlineedgeportal.pkg.network.GoldHenPayloadService
 import com.fazzdev.offlineedgeportal.pkg.server.PkgRegistry
 import com.fazzdev.offlineedgeportal.pkg.util.PkgHeaderParser
 import com.fazzdev.offlineedgeportal.pkg.util.PkgIdentifier
+import com.fazzdev.offlineedgeportal.pkg.util.PkgPreferences
 import com.fazzdev.offlineedgeportal.service.EdgeServerService
 import com.fazzdev.offlineedgeportal.ui.util.AppLanguage
 import com.fazzdev.offlineedgeportal.ui.util.AppStrings
@@ -132,8 +134,12 @@ class MainViewModel : ViewModel() {
         }
     }
 
+    private var appContext: Context? = null
+
     fun loadInitialSettings(context: Context) {
+        appContext = context.applicationContext
         _currentLanguage.value = LanguagePreferences.getLanguage(context)
+        _ps4TargetIp.value = PkgPreferences.getTargetIp(context)
         loadInitialSiteInfo(context)
     }
 
@@ -144,6 +150,9 @@ class MainViewModel : ViewModel() {
 
     fun setPs4TargetIp(ip: String) {
         _ps4TargetIp.value = ip
+        appContext?.let { ctx ->
+            PkgPreferences.setTargetIp(ctx, ip)
+        }
     }
 
     fun loadInitialSiteInfo(context: Context) {
@@ -261,6 +270,24 @@ class MainViewModel : ViewModel() {
         _selectedPkgFiles.value = _selectedPkgFiles.value.filterNot { it.id == id }
     }
 
+    fun togglePkgContentType(id: String) {
+        val currentList = _selectedPkgFiles.value.toMutableList()
+        val index = currentList.indexOfFirst { it.id == id }
+        if (index != -1) {
+            val file = currentList[index]
+            val nextType = when (file.contentType) {
+                "PS4GD" -> "PS4GP"
+                "PS4GP" -> "PS4AC"
+                else -> "PS4GD"
+            }
+            val updated = file.copy(contentType = nextType)
+            currentList[index] = updated
+            PkgRegistry.registerFile(updated)
+            _selectedPkgFiles.value = currentList
+            addPkgLog("Tipe paket diubah: ${file.name} -> $nextType", PkgLogLevel.INFO)
+        }
+    }
+
     fun clearPkgFiles() {
         PkgRegistry.clearFiles()
         _selectedPkgFiles.value = emptyList()
@@ -312,9 +339,44 @@ class MainViewModel : ViewModel() {
             PkgRegistry.resetSession()
 
             addPkgLog("=====================================", PkgLogLevel.INFO)
-            addPkgLog("Sesi Baru: Mengirim ${files.size} paket ke PS4 $targetIp:9090", PkgLogLevel.INFO)
+            addPkgLog("Sesi Baru: Mengirim ${files.size} paket ke PS4 $targetIp", PkgLogLevel.INFO)
             addPkgLog("IP Server HP: $cleanLocalIp:$port", PkgLogLevel.INFO)
 
+            // 1. Jika ada berkas kecil (< 1MB, seperti DLC unlocker), Sony BGFT port 9090 akan menolaknya (0x80990006).
+            // Solusi: Kirim langsung via GoldHEN FTP port 2121 ke /data/pkg/ pada HDD internal PS4!
+            val hasSmallFile = files.any { it.sizeBytes in 1 until 1_048_576L }
+            if (hasSmallFile) {
+                val smallPkg = files.first { it.sizeBytes in 1 until 1_048_576L }
+                addPkgLog("Berkas '${smallPkg.name}' berukuran < 1MB (${smallPkg.formattedSize}). Sistem BGFT 9090 menolak unduhan < 1MB.", PkgLogLevel.INFO)
+                addPkgLog("Mengecek port FTP GoldHEN (2121/1337) di PS4...", PkgLogLevel.INFO)
+                val ftpPort = GoldHenFtpService.detectFtpPort(targetIp)
+                if (ftpPort != null) {
+                    addPkgLog("Mengunggah via GoldHEN FTP (Port $ftpPort) langsung ke /data/pkg/...", PkgLogLevel.INFO)
+                    GoldHenFtpService.onLogMessage = { msg -> _pkgTransferStatus.value = msg }
+                    GoldHenFtpService.onLogEntry = { msg, lvl, det -> addPkgLog(msg, lvl, det) }
+                    var allOk = true
+                    for (file in files) {
+                        val res = GoldHenFtpService.uploadPkgToDataFolder(context, targetIp, ftpPort, file)
+                        if (res.isFailure) {
+                            allOk = false
+                            break
+                        }
+                    }
+                    _isSendingPkg.value = false
+                    if (allOk) {
+                        _pkgTransferStatus.value = if (_currentLanguage.value == AppLanguage.ID) {
+                            "✓ Berhasil diunggah ke /data/pkg/ PS4! Buka Settings -> GoldHEN -> Package Installer di PS4."
+                        } else {
+                            "✓ Uploaded to /data/pkg/ on PS4! Open Settings -> GoldHEN -> Package Installer on PS4."
+                        }
+                        return@launch
+                    }
+                } else {
+                    addPkgLog("Port FTP GoldHEN (2121) tidak terbuka di PS4. Melanjutkan upaya via payload port 9090...", PkgLogLevel.WARN)
+                }
+            }
+
+            // 3. Jalankan GoldHEN BinLoader (Port 9090)
             _pkgTransferStatus.value = if (_currentLanguage.value == AppLanguage.ID) {
                 "Menginjeksi payload 16KB ke GoldHEN 9090 di $targetIp..."
             } else {
@@ -347,6 +409,47 @@ class MainViewModel : ViewModel() {
             } else {
                 val err = result.exceptionOrNull()?.message ?: "Gagal mengirim ke PS4"
                 _pkgTransferStatus.value = "Error: $err"
+            }
+        }
+    }
+
+    fun uploadPkgViaFtp(context: Context) {
+        val files = _selectedPkgFiles.value
+        if (files.isEmpty() || _isSendingPkg.value) return
+
+        val targetIp = _ps4TargetIp.value.trim()
+        viewModelScope.launch(Dispatchers.IO) {
+            _isSendingPkg.value = true
+            addPkgLog("=====================================", PkgLogLevel.INFO)
+            addPkgLog("Mengecek koneksi FTP ke PS4 di $targetIp...", PkgLogLevel.INFO)
+            val ftpPort = GoldHenFtpService.detectFtpPort(targetIp)
+            if (ftpPort == null) {
+                _isSendingPkg.value = false
+                val msg = "Port FTP GoldHEN (2121/1337) tidak terdeteksi di $targetIp. Pastikan FTP Server aktif di menu GoldHEN PS4."
+                addPkgLog(msg, PkgLogLevel.ERROR)
+                _pkgTransferStatus.value = "Error: $msg"
+                return@launch
+            }
+
+            GoldHenFtpService.onLogMessage = { msg -> _pkgTransferStatus.value = msg }
+            GoldHenFtpService.onLogEntry = { msg, lvl, det -> addPkgLog(msg, lvl, det) }
+
+            var allOk = true
+            for (file in files) {
+                val res = GoldHenFtpService.uploadPkgToDataFolder(context, targetIp, ftpPort, file)
+                if (res.isFailure) {
+                    allOk = false
+                    break
+                }
+            }
+
+            _isSendingPkg.value = false
+            if (allOk) {
+                _pkgTransferStatus.value = if (_currentLanguage.value == AppLanguage.ID) {
+                    "✓ Berhasil diunggah ke /data/pkg/ PS4! Buka Settings -> GoldHEN -> Package Installer di PS4."
+                } else {
+                    "✓ Uploaded to /data/pkg/ on PS4! Open Settings -> GoldHEN -> Package Installer on PS4."
+                }
             }
         }
     }
@@ -399,13 +502,34 @@ class MainViewModel : ViewModel() {
     }
 
     private fun queryFileSize(context: Context, uri: Uri): Long {
-        return try {
-            context.contentResolver.openFileDescriptor(uri, "r")?.use {
-                it.statSize
-            } ?: 0L
-        } catch (_: Exception) {
-            0L
-        }
+        // Metoda 1: OpenableColumns.SIZE via ContentResolver query
+        try {
+            context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)?.use { cursor ->
+                val sizeIndex = cursor.getColumnIndex(android.provider.OpenableColumns.SIZE)
+                if (sizeIndex != -1 && cursor.moveToFirst()) {
+                    val size = cursor.getLong(sizeIndex)
+                    if (size > 0L) return size
+                }
+            }
+        } catch (_: Exception) {}
+
+        // Metoda 2: statSize dari openFileDescriptor
+        try {
+            val statSize = context.contentResolver.openFileDescriptor(uri, "r")?.use { it.statSize } ?: 0L
+            if (statSize > 0L) return statSize
+        } catch (_: Exception) {}
+
+        // Metoda 3: Channel size dari FileInputStream
+        try {
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                if (stream is java.io.FileInputStream) {
+                    val chSize = stream.channel.size()
+                    if (chSize > 0L) return chSize
+                }
+            }
+        } catch (_: Exception) {}
+
+        return 0L
     }
 
     private fun formatBytes(bytes: Long): String {

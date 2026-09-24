@@ -252,16 +252,21 @@ object GoldHenPayloadService {
                 val file = files[i]
                 val url = packageUrls.getOrNull(i) ?: continue
                 val name = if (file.name.endsWith(".pkg", ignoreCase = true)) file.name.removeSuffix(".pkg") else file.name
-                val contentId = file.contentId?.ifBlank { null }
+                val rawId = file.contentId?.ifBlank { null }
                     ?: if (!file.titleId.isNullOrBlank()) "UP0001-${file.titleId}_00-0000000000000000"
                     else "UP0001-CUSA00000_00-0000000000000000"
+                val cleanContentId = rawId.filter { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' || it == '-' || it == '_' }.take(36)
+                val contentId = cleanContentId.ifBlank { "UP0001-CUSA00000_00-0000000000000000" }
                 val contentType = file.contentType?.ifBlank { "PS4GD" } ?: "PS4GD"
+                val sizeBytes = if (file.sizeBytes > 0) file.sizeBytes else 1024L
+
+                log("Paket [${i + 1}/${files.size}]: $name | Tipe: $contentType | ID: $contentId | Size: $sizeBytes B", PkgLogLevel.INFO)
 
                 val pkgBuffer = buildPackageInfoBuffer(
                     url = url,
                     name = name,
                     contentId = contentId,
-                    sizeBytes = file.sizeBytes,
+                    sizeBytes = sizeBytes,
                     contentType = contentType
                 )
 

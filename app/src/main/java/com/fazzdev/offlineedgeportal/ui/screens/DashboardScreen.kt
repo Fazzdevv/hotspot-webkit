@@ -299,6 +299,7 @@ fun DashboardScreen(
                     onIpChanged = { viewModel.setPs4TargetIp(it) },
                     onPickPkg = onPickPkgClick,
                     onRemovePkg = { viewModel.removePkgFile(it) },
+                    onToggleContentType = { viewModel.togglePkgContentType(it) },
                     onSendToPs4 = { viewModel.sendPkgToPs4(context) },
                     onHostOnly = { viewModel.hostPkgOnServerOnly(context) }
                 )
@@ -1074,6 +1075,7 @@ fun Ps4PkgInstallerCard(
     onIpChanged: (String) -> Unit,
     onPickPkg: () -> Unit,
     onRemovePkg: (String) -> Unit,
+    onToggleContentType: (String) -> Unit = {},
     onSendToPs4: () -> Unit,
     onHostOnly: () -> Unit
 ) {
@@ -1148,10 +1150,18 @@ fun Ps4PkgInstallerCard(
                                     file.titleId?.let {
                                         BadgeChip(text = it, bgColor = ElectricBlue.copy(alpha = 0.2f), textColor = ElectricBlue)
                                     }
-                                    file.contentType?.let {
-                                        BadgeChip(text = it, bgColor = NeonGreen.copy(alpha = 0.2f), textColor = NeonGreen)
+                                    val (typeLabel, chipBg, chipFg) = when (file.contentType) {
+                                        "PS4GP" -> Triple("Patch (PS4GP) ⟳", AmberWarning.copy(alpha = 0.2f), AmberWarning)
+                                        "PS4AC" -> Triple("DLC (PS4AC) ⟳", CyberCyan.copy(alpha = 0.2f), CyberCyan)
+                                        else -> Triple("Game (PS4GD) ⟳", NeonGreen.copy(alpha = 0.2f), NeonGreen)
                                     }
-                                    BadgeChip(text = file.formattedSize, bgColor = CyberCyan.copy(alpha = 0.2f), textColor = CyberCyan)
+                                    BadgeChip(
+                                        text = typeLabel,
+                                        bgColor = chipBg,
+                                        textColor = chipFg,
+                                        onClick = { onToggleContentType(file.id) }
+                                    )
+                                    BadgeChip(text = file.formattedSize, bgColor = ElectricBlue.copy(alpha = 0.2f), textColor = ElectricBlue)
                                 }
                             }
                             IconButton(onClick = { onRemovePkg(file.id) }, modifier = Modifier.size(24.dp)) {
@@ -1344,11 +1354,17 @@ fun GoldHenGuideCard(strings: AppStrings.Strings, nativeIp: String) {
 }
 
 @Composable
-fun BadgeChip(text: String, bgColor: Color, textColor: Color) {
+fun BadgeChip(
+    text: String,
+    bgColor: Color,
+    textColor: Color,
+    onClick: (() -> Unit)? = null
+) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(4.dp))
             .background(bgColor)
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
             .padding(horizontal = 5.dp, vertical = 2.dp)
     ) {
         Text(text = text, color = textColor, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)

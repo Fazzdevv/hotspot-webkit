@@ -286,15 +286,11 @@ class LocalEdgeServer(
 
         // PlayGo JSON Manifest Endpoint: /json/{fileId}.json or /json/{fileId}
         if (cleanPath.startsWith("/json/")) {
-            if (mode != ServerActiveMode.PKG_SENDER) {
-                serveCustomHtml(output, 404, "PKG Mode Inactive", "Server is currently running in WebKit Exploit mode. Please switch to PS4 PKG Sender tab to enable PKG streaming.")
-                return
-            }
             val rawId = cleanPath.removePrefix("/json/").substringBefore("/").substringBefore("?")
             val fileId = if (rawId.endsWith(".json", ignoreCase = true)) rawId.removeSuffix(".json") else rawId
             val file = PkgRegistry.getFile(fileId)
             if (file != null) {
-                servePlayGoManifest(file, nativeIp, output)
+                servePlayGoManifest(file, nativeIp, rangeHeader, method == "HEAD", output)
                 onLog(
                     RequestLog(
                         timestamp = System.currentTimeMillis(),
@@ -312,10 +308,6 @@ class LocalEdgeServer(
 
         // Direct PKG Streaming Endpoint: /pkg/{fileId}/{filename} or /pkg/{fileId}
         if (cleanPath.startsWith("/pkg/")) {
-            if (mode != ServerActiveMode.PKG_SENDER) {
-                serveCustomHtml(output, 404, "PKG Mode Inactive", "Server is currently running in WebKit Exploit mode. Please switch to PS4 PKG Sender tab to enable PKG streaming.")
-                return
-            }
             val pathWithoutPrefix = cleanPath.removePrefix("/pkg/")
             val fileId = pathWithoutPrefix.substringBefore("/").substringBefore("?")
             val requestedFilename = if (pathWithoutPrefix.contains("/")) pathWithoutPrefix.substringAfter("/").substringBefore("?") else null
@@ -618,20 +610,50 @@ class LocalEdgeServer(
         output.flush()
     }
 
-    private fun servePlayGoManifest(file: PkgFile, nativeIp: String, output: BufferedOutputStream) {
+    private fun servePlayGoManifest(
+        file: PkgFile,
+        nativeIp: String,
+        rangeHeader: String?,
+        isHead: Boolean,
+        output: BufferedOutputStream
+    ) {
         val cleanHost = nativeIp.substringBefore(":")
-        val pieceUrl = "http://$cleanHost:$port/pkg/${file.id}/${file.id}.pkg"
+        val safeFileName = if (file.name.endsWith(".pkg", ignoreCase = true)) file.name else "${file.name}.pkg"
+        val pieceUrl = "http://$cleanHost:$port/pkg/${file.id}/$safeFileName"
         val digest = file.packageDigest ?: "0000000000000000000000000000000000000000000000000000000000000000"
         val manifestJson = "{\"originalFileSize\":${file.sizeBytes},\"packageDigest\":\"$digest\",\"numberOfSplitFiles\":1,\"pieces\":[{\"fileOffset\":0,\"fileSize\":${file.sizeBytes},\"url\":\"$pieceUrl\",\"hashValue\":\"0000000000000000000000000000000000000000\"}]}"
         val jsonBytes = manifestJson.toByteArray(Charsets.UTF_8)
-        val header = (
-            "HTTP/1.1 200 OK\r\n" +
-            "Content-Type: application/json; charset=utf-8\r\n" +
-            "Content-Length: ${jsonBytes.size}\r\n" +
-            "Connection: close\r\n\r\n"
-        ).toByteArray(Charsets.US_ASCII)
-        output.write(header)
-        output.write(jsonBytes)
+        val totalLength = jsonBytes.size.toLong()
+
+        val range = ContentRangeStreamer.parseRangeHeader(rangeHeader, totalLength)
+        if (range != null) {
+            val header = (
+                "HTTP/1.1 206 Partial Content\r\n" +
+                "Content-Type: application/json; charset=utf-8\r\n" +
+                "Accept-Ranges: bytes\r\n" +
+                "Content-Range: bytes ${range.start}-${range.end}/$totalLength\r\n" +
+                "Content-Length: ${range.length}\r\n" +
+                "Connection: keep-alive\r\n\r\n"
+            ).toByteArray(Charsets.US_ASCII)
+            output.write(header)
+            if (!isHead) {
+                val start = range.start.toInt()
+                val len = range.length.toInt()
+                output.write(jsonBytes, start, len)
+            }
+        } else {
+            val header = (
+                "HTTP/1.1 200 OK\r\n" +
+                "Content-Type: application/json; charset=utf-8\r\n" +
+                "Accept-Ranges: bytes\r\n" +
+                "Content-Length: $totalLength\r\n" +
+                "Connection: keep-alive\r\n\r\n"
+            ).toByteArray(Charsets.US_ASCII)
+            output.write(header)
+            if (!isHead) {
+                output.write(jsonBytes)
+            }
+        }
         output.flush()
     }
 
